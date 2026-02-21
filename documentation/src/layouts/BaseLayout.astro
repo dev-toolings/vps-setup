@@ -1,0 +1,27 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "Modern CLI for VPS provisioning with Ansible" } = Astro.props;
+---
+
+<!doctype html>
+<html lang={Astro.currentLocale ?? "en"}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} | VPS Setup</title>
+    <script is:inline>
+      const theme = localStorage.getItem("theme") ??
+        (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.classList.toggle("dark", theme === "dark");
+    </script>
+  </head>
+  <body class="min-h-screen bg-background font-sans antialiased">
+    <slot />
+  </body>
+</html>

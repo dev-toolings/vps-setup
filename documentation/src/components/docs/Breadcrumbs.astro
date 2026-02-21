@@ -1,0 +1,23 @@
+---
+const segments = Astro.url.pathname.split("/").filter(Boolean);
+const crumbs = segments.map((seg, i) => ({
+  label: seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+  href: "/" + segments.slice(0, i + 1).join("/"),
+  isLast: i === segments.length - 1,
+}));
+---
+
+<nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
+  {crumbs.map((crumb) => (
+    <>
+      {crumb.isLast ? (
+        <span class="text-foreground font-medium">{crumb.label}</span>
+      ) : (
+        <>
+          <a href={crumb.href} class="hover:text-foreground transition-colors">{crumb.label}</a>
+          <span>/</span>
+        </>
+      )}
+    </>
+  ))}
+</nav>

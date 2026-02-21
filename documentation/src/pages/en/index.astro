@@ -1,0 +1,31 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { useTranslations } from "@/i18n/utils";
+
+const t = useTranslations("en");
+---
+
+<BaseLayout title={t("landing.hero")}>
+  <div class="flex flex-col items-center justify-center min-h-screen px-4 text-center">
+    <h1 class="text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+      {t("site.title")}
+    </h1>
+    <p class="text-xl text-muted-foreground mb-8 max-w-2xl">
+      {t("landing.subtitle")}
+    </p>
+    <div class="flex gap-4">
+      <a
+        href="/en/docs/getting-started"
+        class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+      >
+        {t("landing.cta")}
+      </a>
+      <a
+        href="/en/docs/getting-started"
+        class="inline-flex items-center justify-center rounded-md border border-input bg-background px-6 py-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+      >
+        {t("landing.docs")}
+      </a>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,30 @@
+---
+import { useTranslations } from "@/i18n/utils";
+import type { Lang } from "@/i18n/ui";
+
+interface Props {
+  prevPage?: { title: string; slug: string } | null;
+  nextPage?: { title: string; slug: string } | null;
+  lang: Lang;
+}
+
+const { prevPage, nextPage, lang } = Astro.props;
+const t = useTranslations(lang);
+---
+
+{(prevPage || nextPage) && (
+  <nav class="flex items-center justify-between border-t border-border mt-12 pt-6">
+    {prevPage ? (
+      <a href={`/${lang}/docs/${prevPage.slug}`} class="group flex flex-col items-start">
+        <span class="text-xs text-muted-foreground">{t("pagination.prev")}</span>
+        <span class="text-sm font-medium group-hover:text-primary transition-colors">{prevPage.title}</span>
+      </a>
+    ) : <div />}
+    {nextPage ? (
+      <a href={`/${lang}/docs/${nextPage.slug}`} class="group flex flex-col items-end">
+        <span class="text-xs text-muted-foreground">{t("pagination.next")}</span>
+        <span class="text-sm font-medium group-hover:text-primary transition-colors">{nextPage.title}</span>
+      </a>
+    ) : <div />}
+  </nav>
+)}

@@ -1,0 +1,148 @@
+---
+title: "Servers"
+description: "Add, manage, and test multiple VPS servers from a single CLI."
+section: "Servers"
+order: 2
+---
+
+# Server Management
+
+VPS Setup lets you manage any number of remote servers. Each server has its own configuration file stored in `~/.config/vps-setup/servers/`, and can be provisioned independently or as part of a batch operation.
+
+## Adding a Server
+
+Use `server add` to register a new server:
+
+```bash
+vps-setup server add <name> [options]
+```
+
+### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--host <host>` | IP address or hostname | Required |
+| `--user <user>` | SSH user | Required |
+| `--port <port>` | SSH port | `22` |
+| `--tags <tags>` | Comma-separated tags | `[]` |
+| `--ssh-key <path>` | Path to SSH private key | System default |
+
+### Examples
+
+**Minimal server:**
+```bash
+vps-setup server add prod-web --host 192.168.1.100 --user root
+```
+
+**Full configuration:**
+```bash
+vps-setup server add prod-db \
+  --host 10.0.0.50 \
+  --user admin \
+  --port 2222 \
+  --tags database,production
+```
+
+**With a custom SSH key:**
+```bash
+vps-setup server add staging \
+  --host staging.example.com \
+  --user deploy \
+  --ssh-key ~/.ssh/id_ed25519_staging
+```
+
+## Listing Servers
+
+View all configured servers:
+
+```bash
+vps-setup server list
+```
+
+Output includes the server name, host, user, port, tags, and last provisioning date.
+
+## Showing Server Details
+
+Inspect a specific server's full configuration:
+
+```bash
+vps-setup server show prod-web
+```
+
+This displays:
+- Host, user, port
+- Tags
+- SSH key path (if set)
+- OS type
+- Creation date
+- Last provisioned date
+
+## Editing a Server
+
+Update one or more fields of an existing server:
+
+```bash
+vps-setup server edit prod-web --host 192.168.1.200
+vps-setup server edit prod-web --port 2222 --user deploy
+```
+
+Only the provided fields are updated; everything else remains unchanged.
+
+## Deleting a Server
+
+Remove a server from the configuration:
+
+```bash
+vps-setup server delete prod-web
+```
+
+> **Note:** This only removes the local configuration. It does not affect the remote server.
+
+## Testing SSH Connection
+
+Before provisioning, verify that SSH access is working:
+
+```bash
+vps-setup server test prod-web
+```
+
+A successful test returns:
+- Connection status
+- Detected operating system and version
+
+If the test fails, VPS Setup will display the SSH error. Common causes include:
+- Wrong host or port
+- SSH key not authorized on the server
+- Firewall blocking the SSH port
+
+## Server Configuration File
+
+Each server is stored as a YAML file at `~/.config/vps-setup/servers/<name>.yml`:
+
+```yaml
+name: prod-web
+host: 192.168.1.100
+user: root
+port: 22
+os: auto
+tags:
+  - production
+  - web
+createdAt: "2024-01-15T10:30:00.000Z"
+lastProvisioned: "2024-01-20T14:22:00.000Z"
+```
+
+## Server Fields Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Unique identifier for the server |
+| `host` | string | IP address or hostname |
+| `user` | string | SSH login user |
+| `port` | number | SSH port (default: 22) |
+| `os` | string | OS hint: `debian`, `ubuntu`, or `auto` |
+| `tags` | string[] | Organizational tags |
+| `sshKey` | string | Path to SSH private key |
+| `notes` | string | Optional notes |
+| `createdAt` | string | ISO timestamp of creation |
+| `lastProvisioned` | string | ISO timestamp of last provisioning |

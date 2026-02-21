@@ -1,0 +1,178 @@
+---
+title: "Configuration"
+description: "Référence de la configuration globale de VPS Setup, incluant tous les paramètres disponibles."
+section: "Configuration"
+order: 4
+---
+
+# Configuration
+
+VPS Setup stocke sa configuration globale dans `~/.config/vps-setup/config.yml`. Ce fichier contrôle le comportement de base : chemin Ansible, profil par défaut, verbosité des logs et rétention de l'historique.
+
+## Répertoire de configuration
+
+```
+~/.config/vps-setup/
+├── config.yml              # Configuration globale
+├── servers/
+│   ├── prod-web.yml
+│   ├── prod-db.yml
+│   └── staging.yml
+├── profiles/
+│   ├── full-stack.yml
+│   ├── minimal.yml
+│   └── security-only.yml
+└── history/
+    ├── prod-web.log
+    └── prod-db.log
+```
+
+Ce répertoire est créé automatiquement lors de l'exécution de `vps-setup init`.
+
+## Structure de config.yml
+
+```yaml
+version: "1.0.0"
+ansiblePath: "./ansible"
+defaultProfile: "full-stack"
+logLevel: "info"
+historyRetentionDays: 30
+```
+
+## Champs de configuration
+
+### `version`
+
+La version du schéma de configuration. Mise à jour automatiquement — ne pas modifier manuellement.
+
+```yaml
+version: "1.0.0"
+```
+
+### `ansiblePath`
+
+Chemin vers le répertoire contenant les playbooks Ansible. VPS Setup recherche le playbook principal dans `<ansiblePath>/playbooks/provision.yml`.
+
+```yaml
+ansiblePath: "./ansible"
+```
+
+Ce chemin peut être absolu ou relatif au répertoire d'installation de VPS Setup :
+
+```yaml
+# Chemin absolu
+ansiblePath: "/home/user/mon-ansible"
+
+# Chemin relatif (résolu depuis le répertoire du binaire)
+ansiblePath: "./ansible"
+```
+
+### `defaultProfile`
+
+Le profil sélectionné par défaut lors de l'exécution interactive de `vps-setup setup`. Si non défini, le premier profil disponible est utilisé.
+
+```yaml
+defaultProfile: "full-stack"
+```
+
+### `logLevel`
+
+Contrôle la verbosité de la sortie des logs. Valeurs acceptées : `debug`, `info`, `warn`, `error`.
+
+```yaml
+logLevel: "info"
+```
+
+| Niveau | Description |
+|--------|-------------|
+| `debug` | Sortie détaillée incluant les informations internes |
+| `info` | Messages informatifs standards (par défaut) |
+| `warn` | Avertissements et erreurs uniquement |
+| `error` | Erreurs uniquement |
+
+### `historyRetentionDays`
+
+Nombre de jours de conservation des entrées d'historique. Les entrées plus anciennes sont purgées automatiquement.
+
+```yaml
+historyRetentionDays: 30
+```
+
+Définissez `0` pour désactiver la purge automatique.
+
+## Afficher la configuration actuelle
+
+```bash
+vps-setup config show
+```
+
+Sortie :
+
+```
+┌─ Global Configuration ──────────────────────┐
+  Config Dir:        ~/.config/vps-setup/
+  Version:           1.0.0
+  Ansible Path:      ./ansible
+  Default Profile:   full-stack
+  Log Level:         info
+  History Retention: 30 days
+```
+
+Pour une sortie en JSON :
+
+```bash
+vps-setup config show --json
+```
+
+```json
+{
+  "version": "1.0.0",
+  "ansiblePath": "./ansible",
+  "defaultProfile": "full-stack",
+  "logLevel": "info",
+  "historyRetentionDays": 30
+}
+```
+
+## Mettre à jour les valeurs de configuration
+
+Utilisez `config set` pour mettre à jour des paramètres individuels sans éditer le fichier manuellement :
+
+```bash
+vps-setup config set <key> <value>
+```
+
+### Clés valides
+
+| Clé | Type | Exemple |
+|-----|------|---------|
+| `ansiblePath` | string | `vps-setup config set ansiblePath /opt/ansible` |
+| `defaultProfile` | string | `vps-setup config set defaultProfile minimal` |
+| `logLevel` | string | `vps-setup config set logLevel debug` |
+| `historyRetentionDays` | number | `vps-setup config set historyRetentionDays 90` |
+
+### Exemples
+
+```bash
+# Changer le profil par défaut
+vps-setup config set defaultProfile minimal
+
+# Activer les logs de débogage
+vps-setup config set logLevel debug
+
+# Conserver l'historique pendant 90 jours
+vps-setup config set historyRetentionDays 90
+
+# Pointer vers un répertoire Ansible personnalisé
+vps-setup config set ansiblePath /opt/mes-playbooks
+```
+
+## Valeurs par défaut
+
+| Champ | Par défaut |
+|-------|------------|
+| `version` | `"1.0.0"` |
+| `ansiblePath` | `"./ansible"` |
+| `defaultProfile` | `"full-stack"` |
+| `logLevel` | `"info"` |
+| `historyRetentionDays` | `30` |

@@ -1,0 +1,121 @@
+---
+title: "History"
+description: "Track and review deployment history for every provisioning run."
+section: "History"
+order: 5
+---
+
+# Deployment History
+
+VPS Setup automatically records every provisioning run to a per-server log file. This gives you full traceability of what was deployed, when, and with which profile.
+
+## How History Works
+
+After each `vps-setup setup` run — whether successful, failed, or a dry run — an entry is appended to the server's history file:
+
+```
+~/.config/vps-setup/history/<server-name>.log
+```
+
+Each entry captures:
+
+| Field | Description |
+|-------|-------------|
+| `timestamp` | ISO 8601 date and time of the run |
+| `server` | Server name |
+| `profile` | Profile used for provisioning |
+| `status` | Result: `success`, `failed`, or `dry-run` |
+| `duration` | Duration in seconds |
+| `changes` | Number of Ansible tasks that made changes |
+| `output` | Raw Ansible output (truncated at 10,000 characters on failure) |
+
+## Viewing History
+
+### All runs for a server
+
+```bash
+vps-setup history prod-web
+```
+
+Output shows a reverse-chronological list of all provisioning runs:
+
+```
+┌─ History: prod-web ────────────────────────────────────┐
+  2024-01-20 14:22  full-stack   success   2m 34s   12 changes
+  2024-01-18 09:11  minimal      success   0m 48s    3 changes
+  2024-01-15 17:05  full-stack   failed    1m 02s    0 changes
+```
+
+### Last N runs
+
+```bash
+vps-setup history prod-web --last 10
+```
+
+Displays only the 10 most recent entries.
+
+## History Entry Statuses
+
+| Status | Meaning |
+|--------|---------|
+| `success` | Ansible playbook completed without errors |
+| `failed` | One or more Ansible tasks failed or the host was unreachable |
+| `dry-run` | Provisioning was simulated with `--dry-run`; no changes were made |
+
+## Retention Policy
+
+By default, history entries older than **30 days** are automatically pruned. You can change this in the global configuration:
+
+```bash
+# Keep history for 90 days
+vps-setup config set historyRetentionDays 90
+
+# Disable automatic pruning
+vps-setup config set historyRetentionDays 0
+```
+
+See the [Configuration](/docs/en/configuration) section for all available options.
+
+## History File Format
+
+History is stored as newline-delimited JSON (one JSON object per line):
+
+```
+~/.config/vps-setup/history/prod-web.log
+```
+
+```json
+{"timestamp":"2024-01-20T14:22:00.000Z","server":"prod-web","profile":"full-stack","status":"success","duration":154,"changes":12}
+{"timestamp":"2024-01-18T09:11:00.000Z","server":"prod-web","profile":"minimal","status":"success","duration":48,"changes":3}
+{"timestamp":"2024-01-15T17:05:00.000Z","server":"prod-web","profile":"full-stack","status":"failed","duration":62,"changes":0,"output":"TASK [docker : Install docker-ce] ..."}
+```
+
+## Checking Server Status
+
+In addition to history, you can check the live status of a server:
+
+```bash
+vps-setup status prod-web
+```
+
+This runs an SSH connection test and checks which services are running. It does not add an entry to the history log.
+
+## Practical Examples
+
+```bash
+# View complete history for a production server
+vps-setup history prod-web
+
+# Review the last 5 runs only
+vps-setup history prod-web --last 5
+
+# Cross-reference: when was this server last provisioned?
+vps-setup server show prod-web
+# → lastProvisioned: 2024-01-20T14:22:00.000Z
+```
+
+## Notes
+
+- History is per-server. There is no aggregated cross-server history view.
+- The `output` field is only stored on failed runs, truncated to 10,000 characters.
+- Dry-run entries are recorded with `status: dry-run` so you can audit simulations separately.

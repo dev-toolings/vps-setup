@@ -1,0 +1,178 @@
+---
+title: "Configuration"
+description: "Global configuration reference for VPS Setup, including all available settings."
+section: "Configuration"
+order: 4
+---
+
+# Configuration
+
+VPS Setup stores its global configuration in `~/.config/vps-setup/config.yml`. This file controls core behavior such as the Ansible path, default profile, log verbosity, and history retention.
+
+## Configuration Directory
+
+```
+~/.config/vps-setup/
+├── config.yml              # Global configuration
+├── servers/
+│   ├── prod-web.yml
+│   ├── prod-db.yml
+│   └── staging.yml
+├── profiles/
+│   ├── full-stack.yml
+│   ├── minimal.yml
+│   └── security-only.yml
+└── history/
+    ├── prod-web.log
+    └── prod-db.log
+```
+
+This directory is created automatically when you run `vps-setup init`.
+
+## config.yml Structure
+
+```yaml
+version: "1.0.0"
+ansiblePath: "./ansible"
+defaultProfile: "full-stack"
+logLevel: "info"
+historyRetentionDays: 30
+```
+
+## Configuration Fields
+
+### `version`
+
+The configuration schema version. Updated automatically — do not change manually.
+
+```yaml
+version: "1.0.0"
+```
+
+### `ansiblePath`
+
+Path to the directory containing the Ansible playbooks. VPS Setup looks for the main playbook at `<ansiblePath>/playbooks/provision.yml`.
+
+```yaml
+ansiblePath: "./ansible"
+```
+
+This can be an absolute path or relative to the VPS Setup installation directory:
+
+```yaml
+# Absolute path
+ansiblePath: "/home/user/my-ansible"
+
+# Relative path (resolved from the binary's directory)
+ansiblePath: "./ansible"
+```
+
+### `defaultProfile`
+
+The profile selected by default when running `vps-setup setup` interactively. If not set, the first available profile is used.
+
+```yaml
+defaultProfile: "full-stack"
+```
+
+### `logLevel`
+
+Controls the verbosity of log output. Accepted values: `debug`, `info`, `warn`, `error`.
+
+```yaml
+logLevel: "info"
+```
+
+| Level | Description |
+|-------|-------------|
+| `debug` | Verbose output including internal details |
+| `info` | Standard informational messages (default) |
+| `warn` | Warnings and errors only |
+| `error` | Errors only |
+
+### `historyRetentionDays`
+
+Number of days to keep history entries. Entries older than this value are pruned automatically.
+
+```yaml
+historyRetentionDays: 30
+```
+
+Set to `0` to disable automatic pruning.
+
+## Viewing the Current Configuration
+
+```bash
+vps-setup config show
+```
+
+Output:
+
+```
+┌─ Global Configuration ──────────────────────┐
+  Config Dir:        ~/.config/vps-setup/
+  Version:           1.0.0
+  Ansible Path:      ./ansible
+  Default Profile:   full-stack
+  Log Level:         info
+  History Retention: 30 days
+```
+
+For JSON output:
+
+```bash
+vps-setup config show --json
+```
+
+```json
+{
+  "version": "1.0.0",
+  "ansiblePath": "./ansible",
+  "defaultProfile": "full-stack",
+  "logLevel": "info",
+  "historyRetentionDays": 30
+}
+```
+
+## Updating Configuration Values
+
+Use `config set` to update individual settings without editing the file manually:
+
+```bash
+vps-setup config set <key> <value>
+```
+
+### Valid keys
+
+| Key | Type | Example |
+|-----|------|---------|
+| `ansiblePath` | string | `vps-setup config set ansiblePath /opt/ansible` |
+| `defaultProfile` | string | `vps-setup config set defaultProfile minimal` |
+| `logLevel` | string | `vps-setup config set logLevel debug` |
+| `historyRetentionDays` | number | `vps-setup config set historyRetentionDays 90` |
+
+### Examples
+
+```bash
+# Change the default profile
+vps-setup config set defaultProfile minimal
+
+# Enable debug logging
+vps-setup config set logLevel debug
+
+# Keep history for 90 days
+vps-setup config set historyRetentionDays 90
+
+# Point to a custom Ansible directory
+vps-setup config set ansiblePath /opt/my-playbooks
+```
+
+## Default Values
+
+| Field | Default |
+|-------|---------|
+| `version` | `"1.0.0"` |
+| `ansiblePath` | `"./ansible"` |
+| `defaultProfile` | `"full-stack"` |
+| `logLevel` | `"info"` |
+| `historyRetentionDays` | `30` |

@@ -1,0 +1,158 @@
+---
+title: "Démarrage rapide"
+description: "Installez VPS Setup et provisionnez votre premier serveur en quelques minutes."
+section: "Getting Started"
+order: 1
+---
+
+# Démarrage rapide
+
+VPS Setup est un outil CLI moderne pour provisionner des serveurs VPS avec Ansible. Il vous permet de gérer plusieurs serveurs, des profils de configuration réutilisables et un historique complet de vos déploiements — le tout depuis une interface en ligne de commande interactive et élégante.
+
+## Prérequis
+
+Avant d'installer VPS Setup, assurez-vous que les outils suivants sont disponibles sur votre machine :
+
+| Outil | Version | Installation |
+|-------|---------|--------------|
+| **Ansible** | >= 2.14 | `pip install ansible` ou `brew install ansible` |
+| **SSH** | — | Accès SSH configuré vers vos serveurs cibles |
+
+## Installation
+
+### Via le script d'installation (recommandé)
+
+La méthode la plus rapide :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MakFly/vps-setup/main/install.sh | bash
+```
+
+### Téléchargement direct
+
+Téléchargez le binaire pré-compilé pour votre plateforme :
+
+**Linux x64**
+```bash
+curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-linux-x64 \
+  -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
+```
+
+**Linux ARM64**
+```bash
+curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-linux-arm64 \
+  -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
+```
+
+**macOS (Apple Silicon)**
+```bash
+curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-darwin-arm64 \
+  -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
+```
+
+**macOS (Intel)**
+```bash
+curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-darwin-x64 \
+  -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
+```
+
+**Windows x64**
+```powershell
+Invoke-WebRequest -Uri "https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-windows-x64.exe" -OutFile "vps-setup.exe"
+```
+
+### Depuis les sources
+
+Compilez VPS Setup depuis les sources avec [Bun](https://bun.sh) :
+
+```bash
+git clone https://github.com/MakFly/vps-setup.git
+cd vps-setup
+bun install
+bun run build
+cp dist/vps-setup ~/.local/bin/
+```
+
+## Configuration de votre premier serveur
+
+### 1. Initialiser la configuration
+
+Exécutez `init` pour créer le répertoire de configuration et les profils par défaut :
+
+```bash
+vps-setup init
+```
+
+Cette commande crée le répertoire `~/.config/vps-setup/` avec un `config.yml` et trois profils par défaut : `full-stack`, `minimal` et `security-only`.
+
+### 2. Ajouter votre premier serveur
+
+```bash
+vps-setup server add prod-web --host 192.168.1.100 --user root
+```
+
+Vous pouvez également spécifier le port, des tags et une clé SSH :
+
+```bash
+vps-setup server add prod-db \
+  --host 10.0.0.50 \
+  --user admin \
+  --port 2222 \
+  --tags database,production
+```
+
+### 3. Tester la connexion SSH
+
+Avant de provisionner, vérifiez que VPS Setup peut atteindre votre serveur :
+
+```bash
+vps-setup server test prod-web
+```
+
+Un test réussi affiche le système d'exploitation et la version détectés.
+
+### 4. Provisionner avec un profil
+
+```bash
+vps-setup setup prod-web --profile full-stack
+```
+
+Le CLI va :
+1. Vérifier la connexion SSH
+2. Afficher les composants qui seront installés
+3. Demander une confirmation
+4. Exécuter le playbook Ansible
+
+Vous pouvez utiliser `--dry-run` pour simuler le provisioning sans effectuer de changements :
+
+```bash
+vps-setup setup prod-web --profile full-stack --dry-run
+```
+
+## Menu interactif
+
+Lancez simplement `vps-setup` sans arguments pour accéder au menu TUI interactif :
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║                    🖥️  VPS Setup Manager                       ║
+╚═══════════════════════════════════════════════════════════════╝
+
+  Servers: 2 | Profiles: 3
+
+  > 🚀 Setup server with profile
+    🖥️  Manage servers
+    📋 Manage profiles
+    📜 View history
+    ⚙️  Settings
+    👋 Exit
+```
+
+Le menu vous donne un accès visuel à toutes les commandes sans avoir à mémoriser la syntaxe.
+
+## Prochaines étapes
+
+- [Gérer plusieurs serveurs](/docs/fr/servers/overview) — ajouter, lister, modifier et tester vos serveurs
+- [Travailler avec les profils](/docs/fr/profiles/overview) — comprendre et personnaliser les profils de configuration
+- [Référence de configuration](/docs/fr/configuration) — configurer les options globales comme le chemin Ansible et le niveau de log
+- [Historique des déploiements](/docs/fr/history) — suivre et consulter les runs de provisioning passés

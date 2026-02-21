@@ -1,0 +1,175 @@
+---
+title: "Profiles"
+description: "Reusable configuration profiles defining which components to install on your servers."
+section: "Profiles"
+order: 3
+---
+
+# Profiles
+
+A profile is a reusable configuration template that defines which software components will be installed on a server during provisioning. Instead of specifying the same options every time, you create a profile once and apply it to any server.
+
+Profiles are stored as YAML files in `~/.config/vps-setup/profiles/`.
+
+## Default Profiles
+
+VPS Setup ships with three built-in profiles that are created automatically when you run `vps-setup init`:
+
+### `full-stack`
+
+A complete development server with all major components:
+
+| Component | Included |
+|-----------|----------|
+| Docker + Docker Compose | Yes |
+| PHP-FPM | Yes |
+| Caddy (web server) | Yes |
+| Node.js (system-wide) | Yes |
+| NVM | No |
+| Bun runtime | Yes |
+| Security hardening | Yes |
+
+```bash
+vps-setup setup prod-web --profile full-stack
+```
+
+### `minimal`
+
+A lightweight setup with only Docker and security hardening:
+
+| Component | Included |
+|-----------|----------|
+| Docker + Docker Compose | Yes |
+| PHP-FPM | No |
+| Caddy | No |
+| Node.js | No |
+| NVM | No |
+| Bun | No |
+| Security hardening | Yes |
+
+```bash
+vps-setup setup prod-web --profile minimal
+```
+
+### `security-only`
+
+Applies only the security hardening role — no application stack:
+
+| Component | Included |
+|-----------|----------|
+| Docker | No |
+| PHP-FPM | No |
+| Caddy | No |
+| Node.js | No |
+| NVM | No |
+| Bun | No |
+| Security hardening | Yes |
+
+```bash
+vps-setup setup prod-web --profile security-only
+```
+
+## Available Components
+
+Each profile controls the following components:
+
+| Component | Description |
+|-----------|-------------|
+| `docker` | Installs Docker Engine and Docker Compose |
+| `php_fpm` | Installs PHP-FPM with common extensions |
+| `caddy` | Installs the Caddy web server |
+| `nodejs` | Installs Node.js system-wide |
+| `nvm` | Installs Node Version Manager (NVM) |
+| `bun` | Installs the Bun JavaScript runtime |
+| `security` | Applies server hardening (firewall, SSH, fail2ban, etc.) |
+
+## Profile Commands
+
+### List profiles
+
+```bash
+vps-setup profile list
+```
+
+### Show profile details
+
+```bash
+vps-setup profile show full-stack
+```
+
+Displays the profile name, description, runtime user, and all component states.
+
+### Create a profile
+
+```bash
+vps-setup profile create my-profile
+```
+
+An interactive prompt will ask you which components to enable. You can also pass a description and runtime user.
+
+### Edit a profile
+
+```bash
+vps-setup profile edit my-profile
+```
+
+Opens an interactive editor to toggle components and update settings.
+
+### Duplicate a profile
+
+```bash
+vps-setup profile duplicate full-stack my-custom-stack
+```
+
+Creates a copy of `full-stack` named `my-custom-stack`. Useful as a starting point for custom configurations.
+
+### Delete a profile
+
+```bash
+vps-setup profile delete my-profile
+```
+
+> **Note:** The built-in profiles (`full-stack`, `minimal`, `security-only`) can be modified but deleting them may affect servers that reference them.
+
+## Profile Configuration File
+
+Each profile is a YAML file at `~/.config/vps-setup/profiles/<name>.yml`:
+
+```yaml
+name: full-stack
+description: Complete development server with all components
+runtimeUser: www-data
+components:
+  docker: true
+  php_fpm: true
+  caddy: true
+  nodejs: true
+  nvm: false
+  bun: true
+  security: true
+overrides:
+  php_version: "8.3"
+  caddy_email: "admin@example.com"
+```
+
+## Profile Fields Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Unique profile identifier |
+| `description` | string | Optional human-readable description |
+| `components` | object | Component enable/disable map |
+| `runtimeUser` | string | System user for running services |
+| `overrides` | object | Custom Ansible variable overrides |
+
+## Using Profiles with Tags
+
+You can run only specific components from a profile using Ansible tags:
+
+```bash
+# Only run Docker and security from the full-stack profile
+vps-setup setup prod-web --profile full-stack --tags docker,security
+
+# Skip PHP-FPM during provisioning
+vps-setup setup prod-web --profile full-stack --skip-tags php_fpm
+```

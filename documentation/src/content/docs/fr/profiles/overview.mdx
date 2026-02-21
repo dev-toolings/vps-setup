@@ -1,0 +1,175 @@
+---
+title: "Profils"
+description: "Profils de configuration réutilisables définissant quels composants installer sur vos serveurs."
+section: "Profiles"
+order: 3
+---
+
+# Profils
+
+Un profil est un template de configuration réutilisable qui définit quels composants logiciels seront installés sur un serveur lors du provisioning. Au lieu de spécifier les mêmes options à chaque fois, vous créez un profil une seule fois et l'appliquez à n'importe quel serveur.
+
+Les profils sont stockés sous forme de fichiers YAML dans `~/.config/vps-setup/profiles/`.
+
+## Profils par défaut
+
+VPS Setup est livré avec trois profils intégrés qui sont créés automatiquement lors de l'exécution de `vps-setup init` :
+
+### `full-stack`
+
+Un serveur de développement complet avec tous les composants principaux :
+
+| Composant | Inclus |
+|-----------|--------|
+| Docker + Docker Compose | Oui |
+| PHP-FPM | Oui |
+| Caddy (serveur web) | Oui |
+| Node.js (système) | Oui |
+| NVM | Non |
+| Runtime Bun | Oui |
+| Hardening sécurité | Oui |
+
+```bash
+vps-setup setup prod-web --profile full-stack
+```
+
+### `minimal`
+
+Une installation légère avec uniquement Docker et le hardening sécurité :
+
+| Composant | Inclus |
+|-----------|--------|
+| Docker + Docker Compose | Oui |
+| PHP-FPM | Non |
+| Caddy | Non |
+| Node.js | Non |
+| NVM | Non |
+| Bun | Non |
+| Hardening sécurité | Oui |
+
+```bash
+vps-setup setup prod-web --profile minimal
+```
+
+### `security-only`
+
+Applique uniquement le rôle de hardening sécurité — aucun stack applicatif :
+
+| Composant | Inclus |
+|-----------|--------|
+| Docker | Non |
+| PHP-FPM | Non |
+| Caddy | Non |
+| Node.js | Non |
+| NVM | Non |
+| Bun | Non |
+| Hardening sécurité | Oui |
+
+```bash
+vps-setup setup prod-web --profile security-only
+```
+
+## Composants disponibles
+
+Chaque profil contrôle les composants suivants :
+
+| Composant | Description |
+|-----------|-------------|
+| `docker` | Installe Docker Engine et Docker Compose |
+| `php_fpm` | Installe PHP-FPM avec les extensions courantes |
+| `caddy` | Installe le serveur web Caddy |
+| `nodejs` | Installe Node.js au niveau système |
+| `nvm` | Installe Node Version Manager (NVM) |
+| `bun` | Installe le runtime JavaScript Bun |
+| `security` | Applique le hardening serveur (pare-feu, SSH, fail2ban, etc.) |
+
+## Commandes de gestion des profils
+
+### Lister les profils
+
+```bash
+vps-setup profile list
+```
+
+### Afficher les détails d'un profil
+
+```bash
+vps-setup profile show full-stack
+```
+
+Affiche le nom du profil, sa description, l'utilisateur runtime et l'état de chaque composant.
+
+### Créer un profil
+
+```bash
+vps-setup profile create mon-profil
+```
+
+Un prompt interactif vous demandera quels composants activer. Vous pouvez également saisir une description et un utilisateur runtime.
+
+### Modifier un profil
+
+```bash
+vps-setup profile edit mon-profil
+```
+
+Ouvre un éditeur interactif pour activer/désactiver les composants et mettre à jour les paramètres.
+
+### Dupliquer un profil
+
+```bash
+vps-setup profile duplicate full-stack mon-stack-custom
+```
+
+Crée une copie de `full-stack` nommée `mon-stack-custom`. Utile comme point de départ pour des configurations personnalisées.
+
+### Supprimer un profil
+
+```bash
+vps-setup profile delete mon-profil
+```
+
+> **Remarque :** Les profils intégrés (`full-stack`, `minimal`, `security-only`) peuvent être modifiés, mais les supprimer peut affecter les serveurs qui y font référence.
+
+## Fichier de configuration d'un profil
+
+Chaque profil est un fichier YAML dans `~/.config/vps-setup/profiles/<name>.yml` :
+
+```yaml
+name: full-stack
+description: Serveur de développement complet avec tous les composants
+runtimeUser: www-data
+components:
+  docker: true
+  php_fpm: true
+  caddy: true
+  nodejs: true
+  nvm: false
+  bun: true
+  security: true
+overrides:
+  php_version: "8.3"
+  caddy_email: "admin@example.com"
+```
+
+## Référence des champs d'un profil
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `name` | string | Identifiant unique du profil |
+| `description` | string | Description lisible optionnelle |
+| `components` | object | Carte d'activation/désactivation des composants |
+| `runtimeUser` | string | Utilisateur système pour exécuter les services |
+| `overrides` | object | Variables Ansible personnalisées à surcharger |
+
+## Utiliser les profils avec les tags
+
+Vous pouvez exécuter uniquement des composants spécifiques d'un profil en utilisant les tags Ansible :
+
+```bash
+# Exécuter uniquement Docker et la sécurité depuis le profil full-stack
+vps-setup setup prod-web --profile full-stack --tags docker,security
+
+# Ignorer PHP-FPM lors du provisioning
+vps-setup setup prod-web --profile full-stack --skip-tags php_fpm
+```

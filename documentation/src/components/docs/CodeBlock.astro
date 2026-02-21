@@ -1,0 +1,17 @@
+---
+interface Props {
+  code: string;
+  lang?: string;
+}
+const { code, lang = "bash" } = Astro.props;
+---
+
+<div class="relative group">
+  <button
+    class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-md bg-muted px-2 py-1 text-xs"
+    onclick="navigator.clipboard.writeText(this.parentElement.querySelector('code').textContent)"
+  >
+    Copy
+  </button>
+  <slot />
+</div>
