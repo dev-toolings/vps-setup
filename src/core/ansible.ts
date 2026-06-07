@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, rmSync, chmodSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { execa } from "execa";
 import type { Server, Profile, AnsibleResult, ProfileComponents } from "@/types/index.ts";
 import { debug, error, info } from "@/utils/index.ts";
@@ -97,16 +98,7 @@ export class AnsibleRunner {
    */
   generateProvisionConfig(profile: Profile): string {
     const config: Record<string, unknown> = {
-      // Components
-      docker: profile.components.docker,
-      php_fpm: profile.components.php_fpm,
-      caddy: profile.components.caddy,
-      nodejs: profile.components.nodejs,
-      nvm: profile.components.nvm,
-      bun: profile.components.bun,
-      security: profile.components.security,
-
-      // Runtime user
+      ...profile.components,
       runtime_user: profile.runtimeUser,
     };
 
@@ -124,17 +116,9 @@ export class AnsibleRunner {
    * Generate tags from components
    */
   generateTags(components: ProfileComponents): string[] {
-    const tags: string[] = [];
-
-    if (components.docker) tags.push("docker");
-    if (components.php_fpm) tags.push("php_fpm");
-    if (components.caddy) tags.push("caddy");
-    if (components.nodejs) tags.push("nodejs");
-    if (components.nvm) tags.push("nvm");
-    if (components.bun) tags.push("bun");
-    if (components.security) tags.push("security");
-
-    return tags;
+    return Object.entries(components)
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => key);
   }
 
   /**
@@ -147,13 +131,11 @@ export class AnsibleRunner {
   ): Promise<AnsibleResult> {
     const startTime = Date.now();
 
-    // Create temp config file
-    const tempDir = join("/tmp", "vps-setup");
-    if (!existsSync(tempDir)) {
-      mkdirSync(tempDir, { recursive: true });
-    }
+    // Create temp config file in a secure per-invocation directory
+    const tempDir = mkdtempSync(join(tmpdir(), "vps-setup-"));
+    chmodSync(tempDir, 0o700);
 
-    const configFile = join(tempDir, `provision_${server.name}_${Date.now()}.yml`);
+    const configFile = join(tempDir, `provision_${server.name}.yml`);
     const configContent = this.generateProvisionConfig(profile);
 
     try {
@@ -182,7 +164,6 @@ export class AnsibleRunner {
       // Execute
       const result = await execa("ansible-playbook", args, {
         timeout: 600000, // 10 minutes timeout
-        buffer: false, // Stream output
       });
 
       const output = result.stdout || "";
@@ -209,9 +190,9 @@ export class AnsibleRunner {
         error: errorMessage,
       };
     } finally {
-      // Cleanup temp file
-      if (existsSync(configFile)) {
-        rmSync(configFile);
+      // Cleanup temp directory
+      if (existsSync(tempDir)) {
+        rmSync(tempDir, { recursive: true });
       }
     }
   }

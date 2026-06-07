@@ -14,7 +14,7 @@ import {
 import { runInteractiveMenu } from "@/cli/menu/interactive.ts";
 import { setLogLevel, info } from "@/utils/index.ts";
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 
 /**
  * Main CLI entry point
@@ -38,7 +38,7 @@ async function main(): Promise<void> {
 
       // Set custom config dir
       if (options.configDir) {
-        process.env.VPS_SETUP_CONFIG_DIR = options.configDir;
+        pm.setConfigDir(options.configDir);
       }
     });
 

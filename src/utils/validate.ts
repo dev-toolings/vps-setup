@@ -15,13 +15,17 @@ export const ServerSchema = z.object({
   host: z.string().min(1, "Host is required").refine(validateHost, {
     message: "Invalid host (must be IP address or valid hostname)",
   }),
-  user: z.string().min(1, "User is required"),
+  user: z
+    .string()
+    .min(1, "User is required")
+    .max(32, "User must be 32 characters or less")
+    .regex(/^[a-zA-Z0-9._-]+$/, "User can only contain letters, numbers, dots, underscores, and hyphens"),
   port: z.number().int().min(1).max(65535).optional().default(22),
   os: z.enum(["debian", "ubuntu", "auto"]).optional().default("auto"),
   tags: z.array(z.string().max(50)).max(100).optional().default([]),
-  sshKey: z.string().optional(),
+  sshKey: z.string().regex(/^[a-zA-Z0-9_.~\/@-]+$/, "SSH key path contains invalid characters").optional(),
   notes: z.string().max(1000).optional(),
-  createdAt: z.string().datetime().optional(),
+  createdAt: z.string().datetime({ offset: true }).default(() => new Date().toISOString()),
   lastProvisioned: z.string().datetime().optional(),
 });
 

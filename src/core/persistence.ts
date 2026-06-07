@@ -44,6 +44,13 @@ export class PersistenceManager {
   }
 
   /**
+   * Override the configuration directory (for --config-dir CLI flag)
+   */
+  setConfigDir(dir: string): void {
+    this.configDir = dir;
+  }
+
+  /**
    * Initialize the configuration directory structure
    */
   initialize(): void {
@@ -165,12 +172,7 @@ export class PersistenceManager {
 
     const serverPath = join(this.configDir, SUBDIRS.servers, `${server.name}.yml`);
 
-    // Add createdAt if not present
-    if (!server.createdAt) {
-      server.createdAt = new Date().toISOString();
-    }
-
-    writeFileSync(serverPath, toYaml(server), "utf-8");
+    writeFileSync(serverPath, toYaml(result.data), "utf-8");
     debug(`Saved server: ${server.name}`);
   }
 
@@ -418,6 +420,12 @@ export class PersistenceManager {
           }
         })
         .filter((e): e is HistoryEntry => e !== null);
+
+      // Enforce retention policy
+      const config = this.getConfig();
+      const retentionDays = config.historyRetentionDays || 30;
+      const cutoff = Date.now() - retentionDays * 86400000;
+      entries = entries.filter((e) => new Date(e.timestamp).getTime() >= cutoff);
 
       // Sort by timestamp descending
       entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

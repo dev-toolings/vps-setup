@@ -27,10 +27,16 @@ export function createHistoryCommand(pm: PersistenceManager): Command {
           return;
         }
 
-        serverName = await p.select({
+        const selected = await p.select({
           message: "Select server",
           options: servers.map((s) => ({ value: s, label: s })),
-        }) as string;
+        });
+
+        if (p.isCancel(selected)) {
+          return;
+        }
+
+        serverName = selected as string;
       }
 
       // Clear history

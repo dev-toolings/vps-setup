@@ -33,10 +33,17 @@ export function createSetupCommand(pm: PersistenceManager): Command {
             process.exit(1);
           }
 
-          serverName = await p.select({
+          const selected = await p.select({
             message: "Select server",
             options: servers.map((s) => ({ value: s, label: s })),
-          }) as string;
+          });
+
+          if (p.isCancel(selected)) {
+            info("Cancelled");
+            return;
+          }
+
+          serverName = selected as string;
         }
       }
 
@@ -64,15 +71,22 @@ export function createSetupCommand(pm: PersistenceManager): Command {
         const config = pm.getConfig();
         const defaultProfile = config.defaultProfile || profiles[0];
 
-        profileName = await p.select({
+        const selectedProfile = await p.select({
           message: "Select profile",
-          options: profiles.map((p) => ({
-            value: p,
-            label: p,
-            hint: p === defaultProfile ? "(default)" : undefined,
+          options: profiles.map((pr) => ({
+            value: pr,
+            label: pr,
+            hint: pr === defaultProfile ? "(default)" : undefined,
           })),
           initialValue: defaultProfile,
-        }) as string;
+        });
+
+        if (p.isCancel(selectedProfile)) {
+          info("Cancelled");
+          return;
+        }
+
+        profileName = selectedProfile as string;
       }
 
       const profile = pm.getProfile(profileName);
@@ -211,11 +225,13 @@ async function provisionServer(
       console.log(`  Duration: ${formatDuration(duration)}`);
       console.log();
 
-      // Update server lastProvisioned
-      pm.saveServer({
-        ...server,
-        lastProvisioned: new Date().toISOString(),
-      });
+      // Update server lastProvisioned (skip for dry-run)
+      if (!options.dryRun) {
+        pm.saveServer({
+          ...server,
+          lastProvisioned: new Date().toISOString(),
+        });
+      }
 
       // Save history
       pm.appendHistory(serverName, {
