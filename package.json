@@ -1,6 +1,6 @@
 {
   "name": "@kev/vps-setup",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "CLI persistant pour le provisioning VPS avec Ansible",
   "author": "Kevin <kevin@example.com>",
   "license": "MIT",

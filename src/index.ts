@@ -14,7 +14,7 @@ import {
 import { runInteractiveMenu } from "@/cli/menu/interactive.ts";
 import { setLogLevel, info } from "@/utils/index.ts";
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 
 /**
  * Main CLI entry point
