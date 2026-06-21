@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# cf-origin-lock — restrict Docker-published ports to Cloudflare edge only.
+#
+# WHY: with Docker (esp. Swarm `ingress` publish mode) inbound traffic to
+# published ports goes PREROUTING -> DOCKER-INGRESS (DNAT) -> FORWARD and
+# NEVER traverses the INPUT chain where UFW lives. UFW rules on those ports
+# are therefore inert. The only chain that sees this traffic (with the real
+# source IP, before POSTROUTING masquerade) is DOCKER-USER. We filter there.
+set -euo pipefail
+
+MARK="cf-origin-lock"
+CHAIN="DOCKER-USER"
+PORTS="{{ cf_origin_lock_ports | join(',') }}"
+INTERNAL="{{ cf_origin_lock_internal_nets | join(' ') }}"
+CF_URL="{{ cf_origin_lock_ipv4_url }}"
+
+CF_V4="$(curl -fsS --max-time 15 "$CF_URL")"
+[ -n "$CF_V4" ] || { echo "FATAL: empty Cloudflare v4 list, aborting (no change)"; exit 1; }
+
+# 1) remove our previous rules (by line number, highest first to avoid reindex)
+for n in $(iptables -L "$CHAIN" --line-numbers -n | awk -v m="$MARK" "\$0 ~ m {print \$1}" | sort -rn); do
+  iptables -D "$CHAIN" "$n"
+done
+
+# 2) rebuild in order: internal ACCEPT, Cloudflare ACCEPT, DROP others
+for net in $INTERNAL; do
+  iptables -A "$CHAIN" -s "$net" -p tcp -m multiport --dports "$PORTS" \
+    -m comment --comment "$MARK" -j ACCEPT
+done
+for net in $CF_V4; do
+  iptables -A "$CHAIN" -s "$net" -p tcp -m multiport --dports "$PORTS" \
+    -m comment --comment "$MARK" -j ACCEPT
+done
+iptables -A "$CHAIN" -p tcp -m multiport --dports "$PORTS" \
+  -m comment --comment "$MARK" -j DROP
+
+echo "cf-origin-lock applied: $(echo "$CF_V4" | grep -c .) CF ranges + internal allowed, DROP others on ${PORTS}"

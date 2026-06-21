@@ -31,3 +31,16 @@ ssh_client_alive_count_max: 2
 ssh_x11_forwarding: "no"
 ssh_allow_agent_forwarding: "yes"
 ssh_allow_tcp_forwarding: "yes"
+
+# Cloudflare origin lock (on-demand)
+# Blocks direct-to-origin access bypassing Cloudflare. Enforced in DOCKER-USER
+# because Docker/Swarm-ingress traffic bypasses UFW. Set to true to enable.
+cf_origin_lock_enabled: false
+cf_origin_lock_ports: [80, 443]
+cf_origin_lock_internal_nets:
+  - 127.0.0.0/8
+  - 10.0.0.0/8
+  - 172.16.0.0/12
+  - 192.168.0.0/16
+cf_origin_lock_ipv4_url: "https://www.cloudflare.com/ips-v4"
+cf_origin_lock_script_path: /usr/local/sbin/cf-origin-lock.sh

@@ -16,3 +16,8 @@
 - name: Include SSH hardening tasks
   ansible.builtin.include_tasks: ssh.yml
   tags: ssh
+
+- name: Include Cloudflare origin lock tasks
+  ansible.builtin.include_tasks: cf_origin_lock.yml
+  when: cf_origin_lock_enabled | default(false) | bool
+  tags: cf_origin_lock

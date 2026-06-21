@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Restrict Docker-published ports to Cloudflare edge (DOCKER-USER)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart={{ cf_origin_lock_script_path }}
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

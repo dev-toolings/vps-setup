@@ -22,3 +22,9 @@
     name: ssh
     state: restarted
   listen: Restart SSH
+
+- name: Apply cf-origin-lock
+  ansible.builtin.systemd:
+    name: cf-origin-lock.service
+    state: restarted
+    daemon_reload: true

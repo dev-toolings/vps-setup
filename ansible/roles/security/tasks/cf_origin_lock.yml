@@ -1,0 +1,38 @@
+---
+# Cloudflare origin lock — block direct-to-origin access that bypasses Cloudflare.
+# Enforced in the DOCKER-USER iptables chain because Docker bypasses UFW.
+# On-demand: only runs when cf_origin_lock_enabled is true.
+
+- name: Ensure iptables is present
+  ansible.builtin.apt:
+    name: iptables
+    state: present
+
+- name: Deploy cf-origin-lock script
+  ansible.builtin.template:
+    src: cf-origin-lock.sh.j2
+    dest: "{{ cf_origin_lock_script_path }}"
+    owner: root
+    group: root
+    mode: "0750"
+  notify: Apply cf-origin-lock
+
+- name: Deploy cf-origin-lock systemd unit
+  ansible.builtin.template:
+    src: cf-origin-lock.service.j2
+    dest: /etc/systemd/system/cf-origin-lock.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply cf-origin-lock
+
+- name: Enable cf-origin-lock service (replays at boot)
+  ansible.builtin.systemd:
+    name: cf-origin-lock.service
+    enabled: true
+    daemon_reload: true
+
+- name: Ensure cf-origin-lock rules are applied now
+  ansible.builtin.systemd:
+    name: cf-origin-lock.service
+    state: started
