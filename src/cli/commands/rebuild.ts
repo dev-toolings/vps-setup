@@ -50,7 +50,6 @@ export function createRebuildCommand(pm: PersistenceManager): Command {
     .command("export <dir>")
     .description("Export an Ansible rebuild bundle")
     .option("-p, --profile <profile>", "Profile to export", "vps-docker")
-    .option("--terraform", "Also generate a generic Terraform/OpenTofu skeleton")
     .action((dir, options) => {
       const profile = pm.getProfile(options.profile);
       if (!profile) {
@@ -116,22 +115,6 @@ export function createRebuildCommand(pm: PersistenceManager): Command {
         ].join("\n"),
         "utf-8"
       );
-
-      if (options.terraform) {
-        const tfDir = join(outDir, "terraform");
-        mkdirSync(tfDir, { recursive: true });
-        writeFileSync(
-          join(tfDir, "main.tf"),
-          [
-            'terraform { required_version = ">= 1.5.0" }',
-            "",
-            "# Generic placeholder. Add your provider/resource here, then feed the created IP to:",
-            "# vps-setup rebuild apply .. --host <ip> --user root",
-            "",
-          ].join("\n"),
-          "utf-8"
-        );
-      }
 
       success(`Rebuild bundle exported to ${outDir}`);
     });

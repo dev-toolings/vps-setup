@@ -175,7 +175,7 @@ vps-setup server add prod-db \
 | `vps-setup setup <server> --tags docker,security` | Exécuter seulement certains rôles |
 | `vps-setup setup --all --profile <name>` | Appliquer à tous les serveurs |
 | `vps-setup setup --local --profile local-docker` | Préparer la machine locale sans hardening VPS |
-| `vps-setup rebuild export ./bundle --profile vps-docker --terraform` | Exporter une configuration reconstructible |
+| `vps-setup rebuild export ./bundle --profile vps-docker` | Exporter une configuration reconstructible |
 | `vps-setup rebuild apply ./bundle --host <ip> --user root` | Rejouer la configuration sur un nouveau VPS |
 | `vps-setup rebuild doctor <server>` | Vérifier SSH, Docker, PostgreSQL, Redis et UFW |
 
