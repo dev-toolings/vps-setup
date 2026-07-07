@@ -15,9 +15,12 @@ export function parseYaml<T>(content: string): T | null {
  * Stringify object to YAML
  */
 export function toYaml(data: unknown): string {
+  // Emit YAML 1.1 so string scalars that collide with 1.1 boolean tokens
+  // (yes/no/on/off/y/n/true/false) are quoted. Ansible parses with PyYAML
+  // (YAML 1.1); an unquoted `yes` override would otherwise be read as the
+  // boolean True and break templates like `PermitRootLogin {{ value }}`.
   return stringify(data, {
-    defaultStringType: "PLAIN",
-    defaultKeyType: "PLAIN",
+    version: "1.1",
     lineWidth: 0,
   });
 }
