@@ -15,6 +15,8 @@ set -e
 REPO="MakFly/vps-setup"
 BINARY_NAME="vps-setup"
 INSTALL_DIR="$HOME/.local/bin"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/vps-setup"
+ANSIBLE_DIR="$DATA_DIR/ansible"
 
 # Colors
 RED='\033[0;31m'
@@ -66,6 +68,36 @@ check_bun() {
     fi
 }
 
+# Download Ansible runtime assets
+install_ansible_assets() {
+    echo -e "${BLUE}Installing Ansible assets...${NC}"
+
+    local ASSET_NAME="vps-setup-ansible.tar.gz"
+    local DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/${ASSET_NAME}"
+    local TEMP_DIR
+    TEMP_DIR=$(mktemp -d)
+
+    mkdir -p "$DATA_DIR"
+
+    echo -e "${BLUE}Downloading from: $DOWNLOAD_URL${NC}"
+
+    if command -v curl &> /dev/null; then
+        curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/$ASSET_NAME"
+    elif command -v wget &> /dev/null; then
+        wget -q "$DOWNLOAD_URL" -O "$TEMP_DIR/$ASSET_NAME"
+    else
+        echo -e "${RED}Neither curl nor wget is available${NC}"
+        rm -rf "$TEMP_DIR"
+        exit 1
+    fi
+
+    rm -rf "$ANSIBLE_DIR"
+    tar -xzf "$TEMP_DIR/$ASSET_NAME" -C "$DATA_DIR"
+    rm -rf "$TEMP_DIR"
+
+    echo -e "${GREEN}✓ Ansible assets installed to: $ANSIBLE_DIR${NC}"
+}
+
 # Install via bun
 install_via_bun() {
     echo -e "${BLUE}Installing via bun...${NC}"
@@ -78,6 +110,7 @@ install_via_bun() {
 
     # Install globally
     bun install -g "github:$REPO"
+    install_ansible_assets
 
     echo -e "${GREEN}✓ Installed via bun${NC}"
 }
@@ -112,6 +145,7 @@ download_binary() {
     chmod +x "$INSTALL_DIR/vps-setup"
 
     echo -e "${GREEN}✓ Binary installed to: $INSTALL_DIR/vps-setup${NC}"
+    install_ansible_assets
 
     # Check if in PATH
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
@@ -150,6 +184,10 @@ build_from_source() {
     mkdir -p "$INSTALL_DIR"
     cp dist/vps-setup "$INSTALL_DIR/"
     chmod +x "$INSTALL_DIR/vps-setup"
+
+    mkdir -p "$DATA_DIR"
+    rm -rf "$ANSIBLE_DIR"
+    cp -R ansible "$ANSIBLE_DIR"
 
     # Cleanup
     cd "$HOME"

@@ -1,0 +1,152 @@
+---
+# Users and application permissions
+
+- name: Ensure deploy group exists
+  ansible.builtin.group:
+    name: "{{ app_group }}"
+    state: present
+
+- name: Ensure deploy user exists
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    shell: "{{ deploy_user_shell }}"
+    groups: "{{ deploy_user_groups }}"
+    append: true
+    create_home: true
+    state: present
+
+- name: Check source authorized_keys for deploy user
+  ansible.builtin.stat:
+    path: "{{ deploy_user_authorized_keys_source }}"
+  register: deploy_authorized_keys_source
+  check_mode: false
+  when: deploy_user_copy_authorized_keys | bool
+
+- name: Refuse SSH hardening without deploy user keys
+  ansible.builtin.fail:
+    msg: >-
+      Root SSH login is disabled, but no authorized_keys source or explicit
+      deploy_user_authorized_keys were found for {{ deploy_user }}.
+  when:
+    - ssh_permit_root_login | default('no') == 'no'
+    - not ((deploy_user_copy_authorized_keys | bool and deploy_authorized_keys_source.stat.exists | default(false)) or deploy_user_authorized_keys | length > 0)
+
+- name: Ensure deploy SSH directory exists
+  ansible.builtin.file:
+    path: "/home/{{ deploy_user }}/.ssh"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0700"
+
+- name: Read source authorized_keys for deploy user
+  ansible.builtin.slurp:
+    src: "{{ deploy_user_authorized_keys_source }}"
+  register: deploy_authorized_keys_content
+  no_log: true
+  when:
+    - deploy_user_copy_authorized_keys | bool
+    - deploy_authorized_keys_source.stat.exists | default(false)
+    - not ansible_check_mode
+
+- name: Install copied authorized_keys for deploy user
+  ansible.builtin.copy:
+    dest: "/home/{{ deploy_user }}/.ssh/authorized_keys"
+    content: "{{ deploy_authorized_keys_content.content | b64decode }}"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0600"
+  no_log: true
+  when:
+    - deploy_user_copy_authorized_keys | bool
+    - deploy_authorized_keys_source.stat.exists | default(false)
+    - not ansible_check_mode
+
+- name: Install explicit authorized keys for deploy user
+  ansible.builtin.lineinfile:
+    path: "/home/{{ deploy_user }}/.ssh/authorized_keys"
+    line: "{{ item }}"
+    create: true
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0600"
+    state: present
+  loop: "{{ deploy_user_authorized_keys }}"
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Explain deploy SSH key installation in check mode
+  ansible.builtin.debug:
+    msg: "Deploy SSH keys will be installed for {{ deploy_user }} during a real run."
+  when:
+    - ansible_check_mode
+    - (deploy_authorized_keys_source.stat.exists | default(false)) or deploy_user_authorized_keys | length > 0
+
+- name: Check sudoers directory
+  ansible.builtin.stat:
+    path: /etc/sudoers.d
+  register: sudoers_dir
+  check_mode: false
+  when: deploy_user_passwordless_sudo | bool
+
+- name: Allow deploy user passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ deploy_user }}"
+    content: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+  when:
+    - deploy_user_passwordless_sudo | bool
+    - not ansible_check_mode or sudoers_dir.stat.exists | default(false)
+
+- name: Ensure application base directory exists
+  ansible.builtin.file:
+    path: "{{ app_base_dir }}"
+    state: directory
+    owner: root
+    group: "{{ app_group }}"
+    mode: "2775"
+
+- name: Ensure application users exist
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    shell: /usr/sbin/nologin
+    home: "{{ item.home | default(app_base_dir + '/' + item.name) }}"
+    group: "{{ app_group }}"
+    groups: "{{ item.groups | default([]) }}"
+    append: true
+    create_home: false
+    system: true
+    state: present
+  loop: "{{ app_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure application directories exist
+  ansible.builtin.file:
+    path: "{{ item.home | default(app_base_dir + '/' + item.name) }}"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ app_group }}"
+    mode: "2775"
+  loop: "{{ app_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure vps-setup config directory exists
+  ansible.builtin.file:
+    path: /etc/vps-setup
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure secrets directory exists
+  ansible.builtin.file:
+    path: /etc/vps-setup/secrets
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"

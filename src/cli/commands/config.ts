@@ -38,7 +38,7 @@ export function createConfigCommand(pm: PersistenceManager): Command {
         console.log(`  ${chalk.bold("Log Level:")}\t\t${cfg.logLevel}`);
       }
 
-      if (cfg.historyRetentionDays) {
+      if (cfg.historyRetentionDays !== undefined) {
         console.log(`  ${chalk.bold("History Retention:")}\t${cfg.historyRetentionDays} days`);
       }
 
@@ -63,7 +63,7 @@ export function createConfigCommand(pm: PersistenceManager): Command {
 
       if (key === "historyRetentionDays") {
         parsedValue = parseInt(value, 10);
-        if (isNaN(parsedValue)) {
+        if (Number.isNaN(parsedValue)) {
           error("historyRetentionDays must be a number");
           process.exit(1);
         }

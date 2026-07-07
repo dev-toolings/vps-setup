@@ -27,7 +27,7 @@
     state: present
     filename: caddy-stable
     update_cache: true
-  when: ansible_distribution == 'Debian'
+  when: ansible_facts.distribution == 'Debian'
 
 - name: Add Caddy repository (Ubuntu)
   ansible.builtin.apt_repository:
@@ -35,13 +35,33 @@
     state: present
     filename: caddy-stable
     update_cache: true
-  when: ansible_distribution == 'Ubuntu'
+  when: ansible_facts.distribution == 'Ubuntu'
 
 - name: Install Caddy
   ansible.builtin.apt:
     name: caddy
-    state: present
+    state: latest
     update_cache: true
+
+- name: Check whether Caddy command is available
+  ansible.builtin.shell: command -v caddy
+  args:
+    executable: /bin/bash
+  register: caddy_command
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Set Caddy runtime availability
+  ansible.builtin.set_fact:
+    caddy_runtime_available: "{{ caddy_command.rc == 0 }}"
+
+- name: Explain skipped Caddy runtime tasks in check mode
+  ansible.builtin.debug:
+    msg: "Caddy would be installed; service and runtime validation tasks are skipped because this is check mode."
+  when:
+    - ansible_check_mode
+    - not caddy_runtime_available
 
 - name: Create Caddy directories
   ansible.builtin.file:
@@ -71,9 +91,13 @@
     state: started
     enabled: true
     daemon_reload: true
+  when: caddy_runtime_available
 
 - name: Verify Caddy is listening
   ansible.builtin.wait_for:
     port: 80
     delay: 2
     timeout: 30
+  when:
+    - caddy_runtime_available
+    - not ansible_check_mode

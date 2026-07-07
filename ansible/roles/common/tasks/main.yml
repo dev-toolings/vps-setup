@@ -41,7 +41,7 @@
   ansible.builtin.lineinfile:
     path: /etc/hosts
     regexp: "^127.0.1.1"
-    line: "127.0.1.1 {{ ansible_hostname }}"
+    line: "127.0.1.1 {{ ansible_facts.hostname }}"
     state: present
   tags: hostname
 

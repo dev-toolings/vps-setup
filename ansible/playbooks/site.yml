@@ -13,12 +13,15 @@
 - name: Include OS-specific variables
   hosts: all
   tasks:
-    - name: Include Debian variables
+    - name: Include global variables
+      ansible.builtin.include_vars: "{{ playbook_dir }}/../inventory/group_vars/all.yml"
+      tags: always
+
+    - name: Include distribution variables
       ansible.builtin.include_vars: "{{ item }}"
       with_first_found:
         - files:
-            - "debian.yml"
-            - "ubuntu.yml"
+            - "{{ ansible_facts.distribution | lower }}.yml"
           paths:
             - "{{ playbook_dir }}/../inventory/group_vars"
           skip: true

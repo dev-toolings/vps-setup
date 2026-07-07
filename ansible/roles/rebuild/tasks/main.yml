@@ -1,0 +1,21 @@
+---
+# Lightweight marker proving this server was configured from a rebuildable profile.
+
+- name: Ensure rebuild metadata directory exists
+  ansible.builtin.file:
+    path: "{{ rebuild_metadata_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write rebuild metadata marker
+  ansible.builtin.copy:
+    dest: "{{ rebuild_metadata_dir }}/rebuild.yml"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      managed_by: vps-setup
+      profile_components: {{ vps_components | to_json }}
+      vault_file: {{ rebuild_vault_file }}

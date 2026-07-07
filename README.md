@@ -174,6 +174,10 @@ vps-setup server add prod-db \
 | `vps-setup setup <server> --dry-run` | Mode simulation (pas de changements) |
 | `vps-setup setup <server> --tags docker,security` | Exécuter seulement certains rôles |
 | `vps-setup setup --all --profile <name>` | Appliquer à tous les serveurs |
+| `vps-setup setup --local --profile local-docker` | Préparer la machine locale sans hardening VPS |
+| `vps-setup rebuild export ./bundle --profile vps-docker --terraform` | Exporter une configuration reconstructible |
+| `vps-setup rebuild apply ./bundle --host <ip> --user root` | Rejouer la configuration sur un nouveau VPS |
+| `vps-setup rebuild doctor <server>` | Vérifier SSH, Docker, PostgreSQL, Redis et UFW |
 
 ### Historique & Status
 
@@ -202,10 +206,19 @@ vps-setup status prod-web
 ├── profiles/
 │   ├── full-stack.yml      # Serveur complet
 │   ├── minimal.yml         # Docker + sécurité
-│   └── security-only.yml   # Hardening uniquement
+│   ├── security-only.yml   # Hardening uniquement
+│   ├── local-docker.yml    # Stack locale sans hardening VPS
+│   ├── vps-docker.yml      # Docker apps + PostgreSQL system-wide
+│   └── vps-bare-metal.yml  # Caddy/systemd + PostgreSQL system-wide
 └── history/
     ├── prod-web.log        # Historique par serveur
     └── prod-db.log
+```
+
+Runtime Ansible assets are installed separately under:
+
+```text
+~/.local/share/vps-setup/ansible/
 ```
 
 ---
@@ -217,6 +230,11 @@ vps-setup status prod-web
 | `full-stack` | Serveur de développement complet | Docker, PHP-FPM, Caddy, Node.js, Bun, Security |
 | `minimal` | Installation minimale | Docker, Security |
 | `security-only` | Hardening uniquement | Security |
+| `local-docker` | Machine locale de développement | Docker, Caddy, Node.js, Bun |
+| `vps-docker` | VPS robuste avec apps Docker | Docker, Caddy, PostgreSQL system-wide, Redis, Users, Security, Rebuild |
+| `vps-bare-metal` | VPS robuste sans apps Docker | Caddy, PHP-FPM, Node.js, Bun, PostgreSQL system-wide, Redis, Users, Security, Rebuild |
+
+PostgreSQL est installé en service système via le dépôt officiel PGDG. Les conteneurs Docker se connectent par défaut via `host.docker.internal:5432`; le port `5432` n'est pas ouvert publiquement par UFW.
 
 ---
 
@@ -242,8 +260,8 @@ vps-setup/
 │   ├── ansible.cfg
 │   ├── Makefile
 │   ├── playbooks/
-│   │   ├── provision.yml   # Playbook principal
-│   │   ├── site.yml
+│   │   ├── site.yml        # Playbook principal
+│   │   ├── provision.yml
 │   │   └── security.yml
 │   ├── roles/
 │   │   ├── docker/         # Installation Docker

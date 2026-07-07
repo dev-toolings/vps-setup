@@ -1,5 +1,5 @@
 ---
 # Node.js role default variables
 
-nodejs_version: "20"
-nodejs_package_state: present
+nodejs_version: "24"
+nodejs_package_state: latest

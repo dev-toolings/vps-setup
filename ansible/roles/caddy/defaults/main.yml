@@ -5,7 +5,7 @@ caddy_email: "admin@example.com"
 caddy_sites:
   - name: "default"
     domains:
-      - "{{ ansible_default_ipv4.address | default('localhost') }}"
+      - "{{ ansible_facts.default_ipv4.address | default('localhost') }}"
     root: "/var/www/html"
     php: true
     encode: true

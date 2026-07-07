@@ -23,16 +23,22 @@ for n in $(iptables -L "$CHAIN" --line-numbers -n | awk -v m="$MARK" "\$0 ~ m {p
   iptables -D "$CHAIN" "$n"
 done
 
-# 2) rebuild in order: internal ACCEPT, Cloudflare ACCEPT, DROP others
-for net in $INTERNAL; do
-  iptables -A "$CHAIN" -s "$net" -p tcp -m multiport --dports "$PORTS" \
-    -m comment --comment "$MARK" -j ACCEPT
-done
-for net in $CF_V4; do
-  iptables -A "$CHAIN" -s "$net" -p tcp -m multiport --dports "$PORTS" \
-    -m comment --comment "$MARK" -j ACCEPT
-done
-iptables -A "$CHAIN" -p tcp -m multiport --dports "$PORTS" \
+# 2) rebuild at the top of DOCKER-USER, before Docker or UFW RETURN rules
+iptables -I "$CHAIN" 1 -p tcp -m multiport --dports "$PORTS" \
   -m comment --comment "$MARK" -j DROP
+mapfile -t CF_RANGES <<< "$CF_V4"
+for ((idx=${#CF_RANGES[@]}-1; idx>=0; idx--)); do
+  net="${CF_RANGES[$idx]}"
+  [ -n "$net" ] || continue
+  iptables -I "$CHAIN" 1 -s "$net" -p tcp -m multiport --dports "$PORTS" \
+    -m comment --comment "$MARK" -j ACCEPT
+done
+read -r -a INTERNAL_RANGES <<< "$INTERNAL"
+for ((idx=${#INTERNAL_RANGES[@]}-1; idx>=0; idx--)); do
+  net="${INTERNAL_RANGES[$idx]}"
+  [ -n "$net" ] || continue
+  iptables -I "$CHAIN" 1 -s "$net" -p tcp -m multiport --dports "$PORTS" \
+    -m comment --comment "$MARK" -j ACCEPT
+done
 
 echo "cf-origin-lock applied: $(echo "$CF_V4" | grep -c .) CF ranges + internal allowed, DROP others on ${PORTS}"

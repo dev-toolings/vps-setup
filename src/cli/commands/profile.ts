@@ -25,6 +25,9 @@ export function createProfileCommands(pm: PersistenceManager): Command {
     .option("--nvm", "Enable NVM")
     .option("--bun", "Enable Bun")
     .option("--security", "Enable security hardening")
+    .option("--users", "Enable Linux users and permissions")
+    .option("--database", "Enable system-wide PostgreSQL/Redis")
+    .option("--rebuild", "Enable rebuild/export metadata")
     .option("--runtime-user <user>", "Runtime user for services")
     .action(async (name, options) => {
       header(`Create Profile: ${name}`);
@@ -39,7 +42,8 @@ export function createProfileCommands(pm: PersistenceManager): Command {
 
       // Check if any component flags were provided
       const hasFlags = options.docker || options.phpFpm || options.caddy ||
-        options.nodejs || options.nvm || options.bun || options.security;
+        options.nodejs || options.nvm || options.bun || options.security ||
+        options.users || options.database || options.rebuild;
 
       if (hasFlags && options.runtimeUser) {
         // Non-interactive mode
@@ -54,6 +58,9 @@ export function createProfileCommands(pm: PersistenceManager): Command {
             nvm: options.nvm || false,
             bun: options.bun || false,
             security: options.security || false,
+            users: options.users || false,
+            database: options.database || false,
+            rebuild: options.rebuild || false,
           },
           runtimeUser: options.runtimeUser,
         };
@@ -77,8 +84,11 @@ export function createProfileCommands(pm: PersistenceManager): Command {
                   { value: "nvm", label: "NVM", hint: "Node Version Manager" },
                   { value: "bun", label: "Bun", hint: "Fast JavaScript runtime" },
                   { value: "security", label: "Security Hardening", hint: "UFW, Fail2ban, SSH" },
+                  { value: "users", label: "Users + Permissions", hint: "deploy user and app users" },
+                  { value: "database", label: "PostgreSQL + Redis", hint: "System-wide database services" },
+                  { value: "rebuild", label: "Rebuild Metadata", hint: "Exportable restore configuration" },
                 ],
-                initialValues: [],
+                initialValues: [] as string[],
                 required: true,
               }),
             runtimeUser: () =>
@@ -100,14 +110,18 @@ export function createProfileCommands(pm: PersistenceManager): Command {
           }
         );
 
+        const selectedComponents = result.components as string[];
         const components: ProfileComponents = {
-          docker: result.components.includes("docker"),
-          php_fpm: result.components.includes("php_fpm"),
-          caddy: result.components.includes("caddy"),
-          nodejs: result.components.includes("nodejs"),
-          nvm: result.components.includes("nvm"),
-          bun: result.components.includes("bun"),
-          security: result.components.includes("security"),
+          docker: selectedComponents.includes("docker"),
+          php_fpm: selectedComponents.includes("php_fpm"),
+          caddy: selectedComponents.includes("caddy"),
+          nodejs: selectedComponents.includes("nodejs"),
+          nvm: selectedComponents.includes("nvm"),
+          bun: selectedComponents.includes("bun"),
+          security: selectedComponents.includes("security"),
+          users: selectedComponents.includes("users"),
+          database: selectedComponents.includes("database"),
+          rebuild: selectedComponents.includes("rebuild"),
         };
 
         profileData = {
@@ -206,6 +220,9 @@ export function createProfileCommands(pm: PersistenceManager): Command {
         nvm: "NVM",
         bun: "Bun",
         security: "Security Hardening",
+        users: "Users + Permissions",
+        database: "PostgreSQL + Redis",
+        rebuild: "Rebuild Metadata",
       };
 
       for (const [key, label] of Object.entries(componentLabels)) {
@@ -259,10 +276,13 @@ export function createProfileCommands(pm: PersistenceManager): Command {
                 { value: "nvm", label: "NVM" },
                 { value: "bun", label: "Bun" },
                 { value: "security", label: "Security Hardening" },
+                { value: "users", label: "Users + Permissions" },
+                { value: "database", label: "PostgreSQL + Redis" },
+                { value: "rebuild", label: "Rebuild Metadata" },
               ],
               initialValues: Object.entries(prof.components)
                 .filter(([, enabled]) => enabled)
-                .map(([key]) => key),
+                .map(([key]) => key) as string[],
               required: true,
             }),
           runtimeUser: () =>
@@ -283,14 +303,18 @@ export function createProfileCommands(pm: PersistenceManager): Command {
         }
       );
 
+      const selectedComponents = result.components as string[];
       const components: ProfileComponents = {
-        docker: result.components.includes("docker"),
-        php_fpm: result.components.includes("php_fpm"),
-        caddy: result.components.includes("caddy"),
-        nodejs: result.components.includes("nodejs"),
-        nvm: result.components.includes("nvm"),
-        bun: result.components.includes("bun"),
-        security: result.components.includes("security"),
+        docker: selectedComponents.includes("docker"),
+        php_fpm: selectedComponents.includes("php_fpm"),
+        caddy: selectedComponents.includes("caddy"),
+        nodejs: selectedComponents.includes("nodejs"),
+        nvm: selectedComponents.includes("nvm"),
+        bun: selectedComponents.includes("bun"),
+        security: selectedComponents.includes("security"),
+        users: selectedComponents.includes("users"),
+        database: selectedComponents.includes("database"),
+        rebuild: selectedComponents.includes("rebuild"),
       };
 
       // Validate at least one component is enabled

@@ -2,7 +2,7 @@
 # Docker role - Main tasks
 
 - name: Include OS-specific installation
-  ansible.builtin.include_tasks: "{{ ansible_distribution | lower }}.yml"
+  ansible.builtin.include_tasks: "{{ ansible_facts.distribution | lower }}.yml"
   tags: docker-install
 
 - name: Install Docker packages
@@ -15,6 +15,31 @@
       - docker-compose-plugin
     state: "{{ docker_package_state }}"
     update_cache: true
+  when:
+    - not ansible_check_mode or docker_repository_available | default(false)
+  tags: docker-install
+
+- name: Check whether Docker command is available
+  ansible.builtin.shell: command -v docker
+  args:
+    executable: /bin/bash
+  register: docker_command
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: docker-install
+
+- name: Set Docker runtime availability
+  ansible.builtin.set_fact:
+    docker_runtime_available: "{{ docker_command.rc == 0 }}"
+  tags: docker-install
+
+- name: Explain skipped Docker runtime tasks in check mode
+  ansible.builtin.debug:
+    msg: "Docker would be installed; runtime Docker service tasks are skipped because this is check mode."
+  when:
+    - ansible_check_mode
+    - not docker_runtime_available
   tags: docker-install
 
 - name: Ensure Docker service is running and enabled
@@ -22,6 +47,7 @@
     name: docker
     state: "{{ docker_service_state }}"
     enabled: "{{ docker_service_enabled }}"
+  when: docker_runtime_available
   tags: docker-service
 
 - name: Create Docker daemon configuration directory
@@ -40,6 +66,7 @@
     mode: '0644'
   notify: Restart Docker
   tags: docker-config
+  when: not ansible_check_mode or docker_runtime_available
 
 - name: Add user to docker group
   ansible.builtin.user:
@@ -51,5 +78,7 @@
 
 - name: Include UFW integration fix
   ansible.builtin.include_tasks: ufw_integration.yml
-  when: docker_iptables_fix | default(true)
+  when:
+    - docker_iptables_fix | default(true)
+    - not ansible_check_mode or ufw_runtime_available | default(false)
   tags: docker-ufw

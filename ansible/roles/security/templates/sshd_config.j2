@@ -6,7 +6,7 @@
 Port {{ ssh_port }}
 AddressFamily any
 ListenAddress 0.0.0.0
-{% if ansible_default_ipv6 is defined %}
+{% if ansible_facts.default_ipv6 is defined and ansible_facts.default_ipv6.address is defined %}
 ListenAddress ::
 {% endif %}
 

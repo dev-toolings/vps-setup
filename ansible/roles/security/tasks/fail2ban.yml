@@ -8,6 +8,23 @@
       - whois
     state: present
 
+- name: Check whether fail2ban service file is available
+  ansible.builtin.stat:
+    path: /lib/systemd/system/fail2ban.service
+  register: fail2ban_service_file
+  check_mode: false
+
+- name: Set fail2ban runtime availability
+  ansible.builtin.set_fact:
+    fail2ban_runtime_available: "{{ fail2ban_service_file.stat.exists }}"
+
+- name: Explain skipped fail2ban service task in check mode
+  ansible.builtin.debug:
+    msg: "fail2ban would be installed; service start is skipped because this is check mode."
+  when:
+    - ansible_check_mode
+    - not fail2ban_runtime_available
+
 - name: Create fail2ban local configuration
   ansible.builtin.copy:
     dest: /etc/fail2ban/jail.local
@@ -33,3 +50,4 @@
     name: fail2ban
     state: started
     enabled: true
+  when: fail2ban_runtime_available

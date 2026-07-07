@@ -7,6 +7,9 @@ import {
   FULL_STACK_COMPONENTS,
   MINIMAL_COMPONENTS,
   SECURITY_ONLY_COMPONENTS,
+  LOCAL_DOCKER_COMPONENTS,
+  VPS_DOCKER_COMPONENTS,
+  VPS_BARE_METAL_COMPONENTS,
 } from "@/types/index.ts";
 import { parseYaml, toYaml, debug, error } from "@/utils/index.ts";
 import { parseServer, parseProfile, parseConfig } from "@/utils/index.ts";
@@ -99,6 +102,32 @@ export class PersistenceManager {
         components: SECURITY_ONLY_COMPONENTS,
         runtimeUser: "root",
       },
+      {
+        name: "local-docker",
+        description: "Local Docker development stack without VPS hardening",
+        components: LOCAL_DOCKER_COMPONENTS,
+        runtimeUser: "root",
+      },
+      {
+        name: "vps-docker",
+        description: "Production VPS with Docker apps, Caddy, system-wide PostgreSQL/Redis, users, and security",
+        components: VPS_DOCKER_COMPONENTS,
+        runtimeUser: "root",
+        overrides: {
+          target_mode: "vps",
+          stack_mode: "docker",
+        },
+      },
+      {
+        name: "vps-bare-metal",
+        description: "Production VPS with Caddy/systemd apps, system-wide PostgreSQL/Redis, users, and security",
+        components: VPS_BARE_METAL_COMPONENTS,
+        runtimeUser: "root",
+        overrides: {
+          target_mode: "vps",
+          stack_mode: "bare_metal",
+        },
+      },
     ];
 
     for (const profile of defaultProfiles) {
@@ -153,8 +182,14 @@ export class PersistenceManager {
   updateConfig(updates: Partial<Config>): Config {
     const current = this.getConfig();
     const updated = { ...current, ...updates };
-    this.saveConfig(updated);
-    return updated;
+    const result = parseConfig(updated);
+    if (!result.success) {
+      const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ");
+      throw new Error(`Invalid config: ${issues}`);
+    }
+
+    this.saveConfig(result.data);
+    return result.data;
   }
 
   // ==================== Servers ====================
@@ -423,9 +458,11 @@ export class PersistenceManager {
 
       // Enforce retention policy
       const config = this.getConfig();
-      const retentionDays = config.historyRetentionDays || 30;
-      const cutoff = Date.now() - retentionDays * 86400000;
-      entries = entries.filter((e) => new Date(e.timestamp).getTime() >= cutoff);
+      const retentionDays = config.historyRetentionDays ?? 30;
+      if (retentionDays > 0) {
+        const cutoff = Date.now() - retentionDays * 86400000;
+        entries = entries.filter((e) => new Date(e.timestamp).getTime() >= cutoff);
+      }
 
       // Sort by timestamp descending
       entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

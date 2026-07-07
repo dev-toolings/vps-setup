@@ -3,3 +3,4 @@
 
 bun_install_path: "~{{ runtime_user }}/.bun"
 runtime_user: "{{ ansible_user | default('root') }}"
+bun_upgrade_existing: true

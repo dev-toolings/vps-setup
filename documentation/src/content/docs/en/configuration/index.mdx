@@ -33,7 +33,7 @@ This directory is created automatically when you run `vps-setup init`.
 
 ```yaml
 version: "1.0.0"
-ansiblePath: "./ansible"
+ansiblePath: "~/.local/share/vps-setup/ansible"
 defaultProfile: "full-stack"
 logLevel: "info"
 historyRetentionDays: 30
@@ -51,20 +51,16 @@ version: "1.0.0"
 
 ### `ansiblePath`
 
-Path to the directory containing the Ansible playbooks. VPS Setup looks for the main playbook at `<ansiblePath>/playbooks/provision.yml`.
+Path to the directory containing the Ansible playbooks. VPS Setup looks for the main playbook at `<ansiblePath>/playbooks/site.yml`.
 
 ```yaml
-ansiblePath: "./ansible"
+ansiblePath: "~/.local/share/vps-setup/ansible"
 ```
 
-This can be an absolute path or relative to the VPS Setup installation directory:
+Use an absolute path for predictable provisioning from any working directory:
 
 ```yaml
-# Absolute path
 ansiblePath: "/home/user/my-ansible"
-
-# Relative path (resolved from the binary's directory)
-ansiblePath: "./ansible"
 ```
 
 ### `defaultProfile`
@@ -127,7 +123,7 @@ vps-setup config show --json
 ```json
 {
   "version": "1.0.0",
-  "ansiblePath": "./ansible",
+  "ansiblePath": "/home/user/.local/share/vps-setup/ansible",
   "defaultProfile": "full-stack",
   "logLevel": "info",
   "historyRetentionDays": 30
@@ -172,7 +168,7 @@ vps-setup config set ansiblePath /opt/my-playbooks
 | Field | Default |
 |-------|---------|
 | `version` | `"1.0.0"` |
-| `ansiblePath` | `"./ansible"` |
+| `ansiblePath` | `"~/.local/share/vps-setup/ansible"` |
 | `defaultProfile` | `"full-stack"` |
 | `logLevel` | `"info"` |
 | `historyRetentionDays` | `30` |

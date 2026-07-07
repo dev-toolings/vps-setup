@@ -1,0 +1,3 @@
+---
+rebuild_metadata_dir: /etc/vps-setup
+rebuild_vault_file: vault.yml

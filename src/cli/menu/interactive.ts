@@ -113,7 +113,8 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
 
   if (p.isCancel(serverName)) return;
 
-  const server = pm.getServer(serverName);
+  const selectedServerName = serverName as string;
+  const server = pm.getServer(selectedServerName);
   if (!server) {
     error("Server not found");
     return;
@@ -128,7 +129,8 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
 
   if (p.isCancel(profileName)) return;
 
-  const profile = pm.getProfile(profileName);
+  const selectedProfileName = profileName as string;
+  const profile = pm.getProfile(selectedProfileName);
   if (!profile) {
     error("Profile not found");
     return;
@@ -145,26 +147,33 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
       { value: "nvm", label: "NVM", selected: profile.components.nvm },
       { value: "bun", label: "Bun", selected: profile.components.bun },
       { value: "security", label: "Security Hardening", selected: profile.components.security },
+      { value: "users", label: "Users + Permissions", selected: profile.components.users },
+      { value: "database", label: "PostgreSQL + Redis", selected: profile.components.database },
+      { value: "rebuild", label: "Rebuild Metadata", selected: profile.components.rebuild },
     ],
   });
 
   if (p.isCancel(selectedComponents)) return;
+  const selectedComponentNames = selectedComponents as string[];
 
   const components: ProfileComponents = {
-    docker: selectedComponents.includes("docker"),
-    php_fpm: selectedComponents.includes("php_fpm"),
-    caddy: selectedComponents.includes("caddy"),
-    nodejs: selectedComponents.includes("nodejs"),
-    nvm: selectedComponents.includes("nvm"),
-    bun: selectedComponents.includes("bun"),
-    security: selectedComponents.includes("security"),
+    docker: selectedComponentNames.includes("docker"),
+    php_fpm: selectedComponentNames.includes("php_fpm"),
+    caddy: selectedComponentNames.includes("caddy"),
+    nodejs: selectedComponentNames.includes("nodejs"),
+    nvm: selectedComponentNames.includes("nvm"),
+    bun: selectedComponentNames.includes("bun"),
+    security: selectedComponentNames.includes("security"),
+    users: selectedComponentNames.includes("users"),
+    database: selectedComponentNames.includes("database"),
+    rebuild: selectedComponentNames.includes("rebuild"),
   };
 
   // Show summary
   console.log();
   console.log(chalk.bold("Summary:"));
-  console.log(`  Server: ${chalk.cyan(serverName)} (${server.host})`);
-  console.log(`  Profile: ${chalk.cyan(profileName)}`);
+  console.log(`  Server: ${chalk.cyan(selectedServerName)} (${server.host})`);
+  console.log(`  Profile: ${chalk.cyan(selectedProfileName)}`);
   console.log(`  Components: ${Object.entries(components)
     .filter(([, v]) => v)
     .map(([k]) => k)
@@ -197,6 +206,7 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
   // Run provisioning
   const runSpinner = p.spinner();
   runSpinner.start("Running ansible-playbook...");
+  const startTime = Date.now();
 
   const config = pm.getConfig();
   const runner = new AnsibleRunner(config.ansiblePath);
@@ -215,10 +225,10 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
       pm.saveServer({ ...server, lastProvisioned: new Date().toISOString() });
 
       // Save history
-      pm.appendHistory(serverName, {
+      pm.appendHistory(selectedServerName, {
         timestamp: new Date().toISOString(),
-        server: serverName,
-        profile: profileName,
+        server: selectedServerName,
+        profile: selectedProfileName,
         status: "success",
         duration: result.duration,
         changes: result.changed,
@@ -226,10 +236,28 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
     } else {
       runSpinner.stop("Provisioning failed");
       error(`Failed: ${result.failed} tasks`);
+      pm.appendHistory(selectedServerName, {
+        timestamp: new Date().toISOString(),
+        server: selectedServerName,
+        profile: selectedProfileName,
+        status: "failed",
+        duration: result.duration,
+        changes: result.changed,
+        output: result.output.slice(0, 10000),
+      });
     }
   } catch (err) {
     runSpinner.stop("Error");
     error(`Error: ${err}`);
+    pm.appendHistory(selectedServerName, {
+      timestamp: new Date().toISOString(),
+      server: selectedServerName,
+      profile: selectedProfileName,
+      status: "failed",
+      duration: Math.round((Date.now() - startTime) / 1000),
+      changes: 0,
+      output: String(err).slice(0, 10000),
+    });
   }
 
   await p.confirm({ message: "Press Enter to continue..." });
@@ -357,8 +385,9 @@ async function testServerFlow(pm: PersistenceManager): Promise<void> {
   });
 
   if (p.isCancel(serverName)) return;
+  const selectedServerName = serverName as string;
 
-  const server = pm.getServer(serverName);
+  const server = pm.getServer(selectedServerName);
   if (!server) return;
 
   const spinner = p.spinner();
@@ -394,15 +423,16 @@ async function deleteServerFlow(pm: PersistenceManager): Promise<void> {
   });
 
   if (p.isCancel(serverName)) return;
+  const selectedServerName = serverName as string;
 
   const confirm = await p.confirm({
-    message: `Delete "${serverName}"?`,
+    message: `Delete "${selectedServerName}"?`,
     initialValue: false,
   });
 
-  if (confirm) {
-    pm.deleteServer(serverName);
-    success(`Server "${serverName}" deleted`);
+  if (!p.isCancel(confirm) && confirm) {
+    pm.deleteServer(selectedServerName);
+    success(`Server "${selectedServerName}" deleted`);
   }
 
   await p.confirm({ message: "Press Enter to continue..." });
@@ -453,6 +483,7 @@ async function profileManagementFlow(pm: PersistenceManager): Promise<void> {
         options: allProfiles.map((p) => ({ value: p, label: p })),
       });
       if (p.isCancel(source)) break;
+      const sourceName = source as string;
 
       const target = await p.text({
         message: "New profile name",
@@ -464,10 +495,11 @@ async function profileManagementFlow(pm: PersistenceManager): Promise<void> {
       });
 
       if (p.isCancel(target)) break;
+      const targetName = target as string;
 
       try {
-        pm.duplicateProfile(source, target);
-        success(`Profile "${source}" duplicated to "${target}"`);
+        pm.duplicateProfile(sourceName, targetName);
+        success(`Profile "${sourceName}" duplicated to "${targetName}"`);
       } catch (err) {
         error(`Failed: ${err}`);
       }
@@ -484,15 +516,16 @@ async function profileManagementFlow(pm: PersistenceManager): Promise<void> {
         options: profilesToDelete.map((p) => ({ value: p, label: p })),
       });
       if (p.isCancel(toDelete)) break;
+      const profileToDelete = toDelete as string;
 
       const confirmDelete = await p.confirm({
-        message: `Delete "${toDelete}"?`,
+        message: `Delete "${profileToDelete}"?`,
         initialValue: false,
       });
 
-      if (confirmDelete) {
-        pm.deleteProfile(toDelete);
-        success(`Profile "${toDelete}" deleted`);
+      if (!p.isCancel(confirmDelete) && confirmDelete) {
+        pm.deleteProfile(profileToDelete);
+        success(`Profile "${profileToDelete}" deleted`);
       }
       await p.confirm({ message: "Press Enter to continue..." });
       break;
@@ -515,11 +548,12 @@ async function historyFlow(pm: PersistenceManager): Promise<void> {
   });
 
   if (p.isCancel(serverName)) return;
+  const selectedServerName = serverName as string;
 
-  const history = pm.getHistory(serverName, 5);
+  const history = pm.getHistory(selectedServerName, 5);
 
   if (history.length === 0) {
-    info(`No history for "${serverName}"`);
+    info(`No history for "${selectedServerName}"`);
   } else {
     console.log();
     for (const entry of history) {
@@ -563,7 +597,7 @@ async function settingsFlow(pm: PersistenceManager): Promise<void> {
         initialValue: config.ansiblePath,
       });
       if (!p.isCancel(ansiblePath)) {
-        pm.updateConfig({ ansiblePath });
+        pm.updateConfig({ ansiblePath: ansiblePath as string });
         success("Ansible path updated");
       }
       break;
@@ -574,7 +608,7 @@ async function settingsFlow(pm: PersistenceManager): Promise<void> {
         options: profiles.map((p) => ({ value: p, label: p })),
       });
       if (!p.isCancel(defaultProfile)) {
-        pm.updateConfig({ defaultProfile });
+        pm.updateConfig({ defaultProfile: defaultProfile as string });
         success("Default profile updated");
       }
       break;

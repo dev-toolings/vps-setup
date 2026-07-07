@@ -7,7 +7,14 @@
   hosts: all
   roles:
     - role: common
-      tags: [common, always]
+      tags: [common]
+
+- name: Users and permissions
+  hosts: all
+  roles:
+    - role: users
+      when: vps_components.users | default(false)
+      tags: [users]
 
 - name: Security hardening
   hosts: all
@@ -22,6 +29,13 @@
     - role: docker
       when: vps_components.docker | default(false)
       tags: [docker]
+
+- name: System database services
+  hosts: all
+  roles:
+    - role: database
+      when: vps_components.database | default(false)
+      tags: [database, postgresql, redis]
 
 - name: PHP-FPM installation
   hosts: all
@@ -57,3 +71,10 @@
     - role: bun
       when: vps_components.bun | default(false)
       tags: [bun]
+
+- name: Rebuild metadata
+  hosts: all
+  roles:
+    - role: rebuild
+      when: vps_components.rebuild | default(false)
+      tags: [rebuild]

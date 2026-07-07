@@ -1,0 +1,302 @@
+---
+# System-wide PostgreSQL + Redis for host and Docker workloads.
+
+- name: Ensure PostgreSQL repository dependencies are installed
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - python3-psycopg2
+    state: present
+    update_cache: true
+
+- name: Ensure PostgreSQL keyring directory exists
+  ansible.builtin.file:
+    path: /usr/share/postgresql-common/pgdg
+    state: directory
+    mode: "0755"
+
+- name: Check whether PostgreSQL keyring directory is available
+  ansible.builtin.stat:
+    path: /usr/share/postgresql-common/pgdg
+  register: postgresql_keyring_dir
+  check_mode: false
+
+- name: Download PostgreSQL PGDG signing key
+  ansible.builtin.get_url:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    dest: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+    mode: "0644"
+  when:
+    - not ansible_check_mode or postgresql_keyring_dir.stat.exists
+
+- name: Detect PostgreSQL repository architecture
+  ansible.builtin.command: dpkg --print-architecture
+  register: postgresql_debian_architecture
+  changed_when: false
+  check_mode: false
+
+- name: Add PostgreSQL PGDG repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/pgdg.sources
+    content: |
+      Types: deb
+      URIs: https://apt.postgresql.org/pub/repos/apt
+      Suites: {{ ansible_facts.distribution_release }}-pgdg
+      Architectures: {{ postgresql_debian_architecture.stdout }}
+      Components: main
+      Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - not ansible_check_mode or postgresql_keyring_dir.stat.exists
+
+- name: Refresh apt cache for PostgreSQL repository
+  ansible.builtin.apt:
+    update_cache: true
+  when: not ansible_check_mode
+
+- name: Check whether PostgreSQL repository source is available
+  ansible.builtin.stat:
+    path: /etc/apt/sources.list.d/pgdg.sources
+  register: postgresql_repository_source_file
+  check_mode: false
+
+- name: Set PostgreSQL repository availability
+  ansible.builtin.set_fact:
+    postgresql_repository_available: "{{ postgresql_repository_source_file.stat.exists }}"
+
+- name: Explain skipped PostgreSQL package install in check mode
+  ansible.builtin.debug:
+    msg: "PostgreSQL PGDG repository would be configured; package installation is skipped because this is check mode."
+  when:
+    - ansible_check_mode
+    - not postgresql_repository_available
+
+- name: Install PostgreSQL latest from PGDG
+  ansible.builtin.apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+    state: latest
+    update_cache: true
+  when:
+    - not ansible_check_mode or postgresql_repository_available
+
+- name: Check whether PostgreSQL client is available
+  ansible.builtin.shell: command -v psql
+  args:
+    executable: /bin/bash
+  register: postgresql_psql_command
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Set PostgreSQL runtime availability
+  ansible.builtin.set_fact:
+    postgresql_runtime_available: "{{ postgresql_psql_command.rc == 0 }}"
+
+- name: Explain skipped PostgreSQL runtime tasks in check mode
+  ansible.builtin.debug:
+    msg: "PostgreSQL would be installed from PGDG; runtime PostgreSQL commands are skipped because this is check mode."
+  when:
+    - ansible_check_mode
+    - not postgresql_runtime_available
+
+- name: Ensure PostgreSQL service is running
+  ansible.builtin.systemd:
+    name: postgresql
+    state: started
+    enabled: true
+  when: postgresql_runtime_available
+
+- name: Locate PostgreSQL config file
+  ansible.builtin.command: psql -Atc "SHOW config_file"
+  become_user: postgres
+  register: postgresql_config_file
+  changed_when: false
+  when: postgresql_runtime_available
+
+- name: Locate PostgreSQL hba file
+  ansible.builtin.command: psql -Atc "SHOW hba_file"
+  become_user: postgres
+  register: postgresql_hba_file
+  changed_when: false
+  when: postgresql_runtime_available
+
+- name: Configure PostgreSQL listen addresses
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_config_file.stdout }}"
+    regexp: "^#?listen_addresses\\s*="
+    line: "listen_addresses = '{{ postgresql_listen_addresses | join(',') }}'"
+  notify: Restart PostgreSQL
+  when: postgresql_runtime_available
+
+- name: Configure PostgreSQL password encryption
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_config_file.stdout }}"
+    regexp: "^#?password_encryption\\s*="
+    line: "password_encryption = '{{ postgresql_auth_method }}'"
+  notify: Restart PostgreSQL
+  when: postgresql_runtime_available
+
+- name: Allow local PostgreSQL access
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_hba_file.stdout }}"
+    line: "host all all 127.0.0.1/32 {{ postgresql_auth_method }}"
+    state: present
+  notify: Restart PostgreSQL
+  when: postgresql_runtime_available
+
+- name: Allow Docker CIDRs to PostgreSQL
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_hba_file.stdout }}"
+    line: "host all all {{ item }} {{ postgresql_auth_method }}"
+    state: present
+  loop: "{{ postgresql_docker_cidrs }}"
+  notify: Restart PostgreSQL
+  when: postgresql_runtime_available
+
+- name: Allow Docker CIDRs through UFW to PostgreSQL
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+    to_port: "{{ postgresql_port }}"
+    proto: tcp
+    comment: "PostgreSQL from Docker"
+  loop: "{{ postgresql_docker_cidrs }}"
+  when:
+    - vps_components.security | default(false)
+    - not (ansible_check_mode and not (ufw_runtime_available | default(false)))
+
+- name: Ensure vps-setup secrets directory exists
+  ansible.builtin.file:
+    path: /etc/vps-setup/secrets
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Ensure database password files exist
+  ansible.builtin.shell: |
+    set -euo pipefail
+    file="/etc/vps-setup/secrets/{{ item.db_user }}.pgpass"
+    if [ ! -f "$file" ]; then
+      umask 077
+      openssl rand -base64 36 > "$file"
+    fi
+  args:
+    executable: /bin/bash
+    creates: "/etc/vps-setup/secrets/{{ item.db_user }}.pgpass"
+  loop: "{{ postgresql_apps }}"
+  loop_control:
+    label: "{{ item.db_user }}"
+  when: not ansible_check_mode
+
+- name: Read database password files
+  ansible.builtin.slurp:
+    src: "/etc/vps-setup/secrets/{{ item.db_user }}.pgpass"
+  register: postgresql_app_password_files
+  loop: "{{ postgresql_apps }}"
+  loop_control:
+    label: "{{ item.db_user }}"
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Create application database roles and databases
+  ansible.builtin.shell: |
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 <<'SQL'
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{{ item.item.db_user }}') THEN
+        CREATE ROLE "{{ item.item.db_user }}" LOGIN PASSWORD '{{ item.content | b64decode | trim }}';
+      ELSE
+        ALTER ROLE "{{ item.item.db_user }}" LOGIN PASSWORD '{{ item.content | b64decode | trim }}';
+      END IF;
+    END
+    $$;
+    SELECT 'CREATE DATABASE "{{ item.item.db_name }}" OWNER "{{ item.item.db_user }}"'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{{ item.item.db_name }}')\gexec
+    REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+    GRANT CONNECT ON DATABASE "{{ item.item.db_name }}" TO "{{ item.item.db_user }}";
+    SQL
+  args:
+    executable: /bin/bash
+  become_user: postgres
+  loop: "{{ postgresql_app_password_files.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.db_name }}"
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - postgresql_runtime_available
+
+- name: Install Redis
+  ansible.builtin.apt:
+    name: redis-server
+    state: "{{ redis_package_state }}"
+  when: redis_enabled | bool
+
+- name: Check whether Redis server is available
+  ansible.builtin.shell: command -v redis-server
+  args:
+    executable: /bin/bash
+  register: redis_server_command
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: redis_enabled | bool
+
+- name: Set Redis runtime availability
+  ansible.builtin.set_fact:
+    redis_runtime_available: "{{ redis_server_command.rc | default(1) == 0 }}"
+  when: redis_enabled | bool
+
+- name: Explain skipped Redis runtime tasks in check mode
+  ansible.builtin.debug:
+    msg: "Redis would be installed; runtime Redis service/config tasks are skipped because this is check mode."
+  when:
+    - redis_enabled | bool
+    - ansible_check_mode
+    - not (redis_runtime_available | default(false))
+
+- name: Configure Redis bind addresses
+  ansible.builtin.lineinfile:
+    path: /etc/redis/redis.conf
+    regexp: "^bind "
+    line: "bind {{ redis_bind_addresses | join(' ') }}"
+  notify: Restart Redis
+  when:
+    - redis_enabled | bool
+    - redis_runtime_available | default(false)
+
+- name: Ensure Redis service is running
+  ansible.builtin.systemd:
+    name: redis-server
+    state: started
+    enabled: true
+  when:
+    - redis_enabled | bool
+    - redis_runtime_available | default(false)
+
+- name: Ensure Docker compose snippet directory exists
+  ansible.builtin.file:
+    path: "{{ database_compose_snippet_dir }}"
+    state: directory
+    owner: root
+    group: "{{ app_group | default('root') }}"
+    mode: "2775"
+  when: vps_components.docker | default(false)
+
+- name: Install Docker compose PostgreSQL host snippet
+  ansible.builtin.template:
+    src: docker-postgresql-host.yml.j2
+    dest: "{{ database_compose_snippet_dir }}/postgresql-host.yml"
+    owner: root
+    group: "{{ app_group | default('root') }}"
+    mode: "0644"
+  when: vps_components.docker | default(false)

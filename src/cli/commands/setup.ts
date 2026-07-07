@@ -21,7 +21,26 @@ export function createSetupCommand(pm: PersistenceManager): Command {
     .option("--skip-tags <tags>", "Comma-separated tags to skip")
     .option("-v, --verbose", "Verbose output")
     .option("--all", "Apply to all servers")
+    .option("--local", "Apply profile to the local machine")
     .action(async (serverName, options) => {
+      if (options.local) {
+        const profileName = options.profile || "local-docker";
+        const profile = pm.getProfile(profileName);
+        if (!profile) {
+          error(`Profile "${profileName}" not found`);
+          process.exit(1);
+        }
+        if (!options.tags) {
+          const confirmed = await confirmComponents(profile.components);
+          if (!confirmed) {
+            info("Cancelled");
+            return;
+          }
+        }
+        await provisionServer(pm, "local", profileName, options);
+        return;
+      }
+
       // Initialize if needed
       if (!pm.serverExists(serverName || "")) {
         if (!serverName) {
@@ -131,10 +150,11 @@ async function confirmComponents(components: ProfileComponents): Promise<boolean
   }
   console.log();
 
-  return p.confirm({
+  const confirmed = await p.confirm({
     message: "Proceed with provisioning?",
     initialValue: true,
   });
+  return !p.isCancel(confirmed) && confirmed;
 }
 
 /**
@@ -144,9 +164,16 @@ async function provisionServer(
   pm: PersistenceManager,
   serverName: string,
   profileName: string,
-  options: { dryRun?: boolean; verbose?: boolean; tags?: string; skipTags?: string }
+  options: { dryRun?: boolean; verbose?: boolean; tags?: string; skipTags?: string; local?: boolean }
 ): Promise<void> {
-  const server = pm.getServer(serverName);
+  const server = options.local
+    ? {
+        name: "local",
+        host: "localhost",
+        user: process.env.USER || "root",
+        createdAt: new Date().toISOString(),
+      }
+    : pm.getServer(serverName);
   const profile = pm.getProfile(profileName);
 
   if (!server || !profile) {
@@ -172,24 +199,26 @@ async function provisionServer(
 
   // Check playbook exists
   if (!runner.checkAnsiblePath()) {
-    error(`Playbook not found at ${config.ansiblePath}/playbooks/provision.yml`);
+    error(`Playbook not found at ${config.ansiblePath}/playbooks/site.yml`);
     info("Check the ansiblePath configuration");
     process.exit(1);
   }
 
-  // Test SSH connection first
-  const spinner = p.spinner();
-  spinner.start("Testing SSH connection...");
+  if (!options.local) {
+    // Test SSH connection first
+    const spinner = p.spinner();
+    spinner.start("Testing SSH connection...");
 
-  const testResult = await testSSHConnection(server);
+    const testResult = await testSSHConnection(server);
 
-  if (!testResult.success) {
-    spinner.stop("SSH connection failed");
-    error(testResult.error || "Unknown error");
-    process.exit(1);
+    if (!testResult.success) {
+      spinner.stop("SSH connection failed");
+      error(testResult.error || "Unknown error");
+      process.exit(1);
+    }
+
+    spinner.stop(`SSH OK (${testResult.os} ${testResult.version})`);
   }
-
-  spinner.stop(`SSH OK (${testResult.os} ${testResult.version})`);
 
   // Parse tags
   const tags = options.tags ? options.tags.split(",").map((t: string) => t.trim()) : undefined;
@@ -212,6 +241,7 @@ async function provisionServer(
       skipTags,
       check: options.dryRun,
       verbose: options.verbose,
+      local: options.local,
     });
 
     const duration = Math.round((Date.now() - startTime) / 1000);
@@ -227,10 +257,12 @@ async function provisionServer(
 
       // Update server lastProvisioned (skip for dry-run)
       if (!options.dryRun) {
-        pm.saveServer({
-          ...server,
-          lastProvisioned: new Date().toISOString(),
-        });
+        if (!options.local) {
+          pm.saveServer({
+            ...server,
+            lastProvisioned: new Date().toISOString(),
+          });
+        }
       }
 
       // Save history
@@ -332,7 +364,7 @@ async function provisionAllServers(
       });
 
       // Update server
-      if (result.success) {
+      if (result.success && !options.dryRun) {
         pm.saveServer({
           ...server,
           lastProvisioned: new Date().toISOString(),
@@ -344,7 +376,7 @@ async function provisionAllServers(
         timestamp: new Date().toISOString(),
         server: serverName,
         profile: options.profile,
-        status: result.success ? "success" : "failed",
+        status: result.success ? (options.dryRun ? "dry-run" : "success") : "failed",
         duration: results[results.length - 1].duration,
         changes: result.changed,
       });

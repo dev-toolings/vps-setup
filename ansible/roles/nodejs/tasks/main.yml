@@ -14,7 +14,12 @@
 
 - name: Check if we need to install/update Node.js
   ansible.builtin.set_fact:
-    nodejs_needs_install: "{{ node_version_check.rc != 0 or nodejs_force_install | default(false) }}"
+    nodejs_needs_install: >-
+      {{
+        node_version_check.rc != 0
+        or nodejs_force_install | default(false)
+        or not (node_version_check.stdout | default('') is match('^v' ~ nodejs_version ~ '\\.'))
+      }}
 
 - name: Download NodeSource setup script
   ansible.builtin.get_url:
@@ -33,7 +38,7 @@
     name: nodejs
     state: "{{ nodejs_package_state }}"
     update_cache: true
-  when: nodejs_needs_install
+  when: nodejs_needs_install or nodejs_package_state == 'latest'
 
 - name: Clean up setup script
   ansible.builtin.file:

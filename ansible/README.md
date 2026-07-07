@@ -144,8 +144,9 @@ ansible/
 
 ### Docker + UFW Fix
 Docker manipulates iptables directly, bypassing UFW. This setup:
-1. Disables Docker's iptables manipulation
-2. Adds explicit UFW rules for Docker traffic
+1. Keeps Docker iptables support enabled
+2. Uses UFW and DOCKER-USER integration for Docker traffic policy
+3. Lets containers reach system-wide PostgreSQL through `host.docker.internal`
 
 ## Verification
 

@@ -10,6 +10,7 @@ import {
   createConfigCommand,
   createInitCommand,
   createUninstallCommand,
+  createRebuildCommand,
 } from "@/cli/commands/index.ts";
 import { runInteractiveMenu } from "@/cli/menu/interactive.ts";
 import { setLogLevel, info } from "@/utils/index.ts";
@@ -55,6 +56,7 @@ async function main(): Promise<void> {
   program.addCommand(createSetupCommand(pm));
   program.addCommand(createHistoryCommand(pm));
   program.addCommand(createConfigCommand(pm));
+  program.addCommand(createRebuildCommand(pm));
   program.addCommand(createUninstallCommand());
 
   // Add status command (quick status check)

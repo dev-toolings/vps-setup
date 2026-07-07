@@ -6,7 +6,8 @@
 # -------------------------------------------
 # Versions
 # -------------------------------------------
-nodejs_version: "20"
+nodejs_version: "24"
+nodejs_package_state: latest
 php_version_default: "8.2"
 nvm_version: "0.39.7"
 
@@ -33,8 +34,9 @@ common_packages:
   - ca-certificates
   - gnupg
   - lsb-release
-  - software-properties-common
   - rsync
+  - openssl
+  - sudo
   - jq
   - tree
   - ncdu
@@ -107,7 +109,7 @@ caddy_email: "admin@example.com"
 caddy_sites:
   - name: "default"
     domains:
-      - "{{ ansible_default_ipv4.address | default('localhost') }}"
+      - "{{ ansible_facts.default_ipv4.address | default('localhost') }}"
     root: "/var/www/html"
     php: true
     encode: true
@@ -121,6 +123,44 @@ caddy_sites:
 runtime_user: "{{ ansible_user | default('root') }}"
 
 # -------------------------------------------
+# Users and Application Permissions
+# -------------------------------------------
+deploy_user: deploy
+deploy_user_shell: /bin/bash
+deploy_user_groups:
+  - sudo
+deploy_user_copy_authorized_keys: true
+deploy_user_authorized_keys_source: "~{{ ansible_user | default('root') }}/.ssh/authorized_keys"
+deploy_user_authorized_keys: []
+deploy_user_passwordless_sudo: true
+app_base_dir: /srv/apps
+app_group: deploy
+app_users: []
+
+# -------------------------------------------
+# Database Configuration
+# -------------------------------------------
+postgresql_version: latest
+postgresql_listen_addresses:
+  - "127.0.0.1"
+  - "172.17.0.1"
+postgresql_port: 5432
+postgresql_docker_cidrs:
+  - "172.17.0.0/16"
+postgresql_auth_method: scram-sha-256
+postgresql_apps: []
+redis_enabled: true
+redis_package_state: latest
+redis_bind_addresses:
+  - "127.0.0.1"
+
+# -------------------------------------------
+# Rebuild Export Metadata
+# -------------------------------------------
+rebuild_metadata_dir: /etc/vps-setup
+rebuild_vault_file: vault.yml
+
+# -------------------------------------------
 # Component Selection (defaults)
 # -------------------------------------------
 vps_components:
@@ -131,3 +171,6 @@ vps_components:
   nvm: false
   bun: true
   security: true
+  users: false
+  database: false
+  rebuild: false

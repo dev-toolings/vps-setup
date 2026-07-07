@@ -5,13 +5,16 @@
   ansible.builtin.command: caddy validate --config /etc/caddy/Caddyfile
   changed_when: false
   notify: Reload Caddy
+  when: caddy_runtime_available | default(true)
 
 - name: Reload Caddy
   ansible.builtin.systemd:
     name: caddy
     state: reloaded
+  when: caddy_runtime_available | default(true)
 
 - name: Restart Caddy
   ansible.builtin.systemd:
     name: caddy
     state: restarted
+  when: caddy_runtime_available | default(true)

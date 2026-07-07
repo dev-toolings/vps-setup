@@ -15,7 +15,7 @@ common_packages:
   - ca-certificates
   - gnupg
   - lsb-release
-  - software-properties-common
+  - sudo
   - rsync
   - jq
   - tree

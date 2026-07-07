@@ -4,6 +4,11 @@ import * as prompts from "@clack/prompts";
 import { existsSync, rmSync } from "fs";
 import { resolve } from "path";
 
+export function isSafeVpsSetupBinaryPath(binaryPath: string): boolean {
+  const binaryName = binaryPath.split(/[\\/]/).pop()?.toLowerCase() || "";
+  return /^vps-setup(?:-.+)?(?:\.exe)?$/.test(binaryName);
+}
+
 export function createUninstallCommand(): Command {
   return new Command("uninstall")
     .description("Uninstall vps-setup from this machine")
@@ -32,16 +37,23 @@ export function createUninstallCommand(): Command {
         }
       }
 
-      // Remove binary
-      try {
-        rmSync(binaryPath, { force: true });
-        console.log(chalk.green(`✓ Removed ${binaryPath}`));
-      } catch {
+      if (!isSafeVpsSetupBinaryPath(binaryPath)) {
         console.log(
           chalk.yellow(
-            `⚠ Could not remove ${binaryPath} — remove it manually`
+            `⚠ Refusing to remove ${binaryPath} because it does not look like a vps-setup binary`
           )
         );
+      } else {
+        try {
+          rmSync(binaryPath, { force: true });
+          console.log(chalk.green(`✓ Removed ${binaryPath}`));
+        } catch {
+          console.log(
+            chalk.yellow(
+              `⚠ Could not remove ${binaryPath} — remove it manually`
+            )
+          );
+        }
       }
 
       // Ask about config

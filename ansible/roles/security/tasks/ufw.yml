@@ -6,29 +6,55 @@
     name: ufw
     state: present
 
+- name: Check whether UFW command is available
+  ansible.builtin.shell: command -v ufw
+  args:
+    executable: /bin/bash
+  register: ufw_command
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Set UFW runtime availability
+  ansible.builtin.set_fact:
+    ufw_runtime_available: "{{ ufw_command.rc == 0 }}"
+
+- name: Explain skipped UFW runtime tasks in check mode
+  ansible.builtin.debug:
+    msg: "UFW package would be installed; runtime UFW commands are skipped because this is check mode."
+  when:
+    - ansible_check_mode
+    - not ufw_runtime_available
+
 - name: Reset UFW to defaults
   community.general.ufw:
     state: reset
-  when: ufw_reset | default(false)
+  when:
+    - ufw_reset | default(false)
+    - ufw_runtime_available
 
 - name: Set default incoming policy
   community.general.ufw:
     direction: incoming
     policy: "{{ ufw_default_policies.incoming }}"
+  when: ufw_runtime_available
 
 - name: Set default outgoing policy
   community.general.ufw:
     direction: outgoing
     policy: "{{ ufw_default_policies.outgoing }}"
+  when: ufw_runtime_available
 
 - name: Set default routed policy
   community.general.ufw:
     direction: routed
     policy: "{{ ufw_default_policies.routed }}"
+  when: ufw_runtime_available
 
 - name: Enable logging
   community.general.ufw:
     logging: "{{ ufw_logging }}"
+  when: ufw_runtime_available
 
 - name: Allow SSH port
   community.general.ufw:
@@ -36,6 +62,7 @@
     port: "{{ ssh_port }}"
     proto: tcp
     comment: SSH
+  when: ufw_runtime_available
 
 - name: Allow configured ports
   community.general.ufw:
@@ -43,12 +70,14 @@
     port: "{{ item }}"
     proto: tcp
   loop: "{{ ufw_allowed_ports | difference([ssh_port]) }}"
+  when: ufw_runtime_available
 
 - name: Enable UFW
   community.general.ufw:
     state: enabled
     policy: deny
     direction: incoming
+  when: ufw_runtime_available
 
 - name: Ensure UFW starts on boot
   ansible.builtin.lineinfile:
@@ -56,3 +85,4 @@
     regexp: '^ENABLED='
     line: 'ENABLED=yes'
     state: present
+  when: ufw_runtime_available

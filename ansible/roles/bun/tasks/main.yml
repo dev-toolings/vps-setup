@@ -31,6 +31,17 @@
   become_user: "{{ runtime_user }}"
   when: not bun_installed.stat.exists
 
+- name: Upgrade existing Bun to latest
+  ansible.builtin.command: "{{ bun_install_path }}/bin/bun upgrade"
+  register: bun_upgrade_result
+  changed_when: "'Bun is already up to date' not in (bun_upgrade_result.stdout ~ bun_upgrade_result.stderr)"
+  become: true
+  become_user: "{{ runtime_user }}"
+  when:
+    - bun_installed.stat.exists
+    - bun_upgrade_existing | bool
+    - not ansible_check_mode
+
 - name: Create Bun profile script
   ansible.builtin.copy:
     dest: "/etc/profile.d/bun.sh"

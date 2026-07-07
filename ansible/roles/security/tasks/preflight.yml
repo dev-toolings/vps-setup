@@ -15,11 +15,13 @@
   changed_when: false
   failed_when: false
   become: false
+  check_mode: false
 
 - name: Check if authorized_keys exists on remote
   ansible.builtin.stat:
     path: "~{{ ansible_user }}/.ssh/authorized_keys"
   register: remote_authorized_keys_stat
+  check_mode: false
 
 - name: Warning - No SSH keys detected
   ansible.builtin.debug:
@@ -54,6 +56,7 @@
     msg: "SSH hardening aborted by user"
   when:
     - ssh_hardening_confirm is defined
+    - not (ssh_hardening_confirm.skipped | default(false))
     - ssh_hardening_confirm.user_input | default('') | lower != 'yes'
 
 - name: Pre-flight check passed

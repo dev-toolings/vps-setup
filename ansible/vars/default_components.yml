@@ -10,5 +10,8 @@ vps_components:
   nvm: false
   bun: true
   security: true
+  users: false
+  database: false
+  rebuild: false
 
 runtime_user: "{{ ansible_user | default('root') }}"

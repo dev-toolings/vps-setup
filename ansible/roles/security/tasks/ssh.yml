@@ -19,7 +19,14 @@
     validate: sshd -t -f %s
   notify: Restart SSH
 
+- name: Gather service facts for SSH restart
+  ansible.builtin.service_facts:
+
+- name: Select SSH service name
+  ansible.builtin.set_fact:
+    ssh_service_name: "{{ 'sshd' if 'sshd.service' in ansible_facts.services else 'ssh' }}"
+
 - name: Ensure SSH service is enabled
   ansible.builtin.systemd:
-    name: "{{ 'sshd' if ansible_distribution == 'Debian' else 'ssh' }}"
+    name: "{{ ssh_service_name }}"
     enabled: true

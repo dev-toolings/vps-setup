@@ -1,4 +1,6 @@
 import type { ProfileComponents } from "./profile.ts";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 /**
  * History entry for provisioning runs
@@ -41,7 +43,7 @@ export interface Config {
  */
 export const DEFAULT_CONFIG: Config = {
   version: "1.0.0",
-  ansiblePath: "./ansible",
+  ansiblePath: join(homedir(), ".local", "share", "vps-setup", "ansible"),
   defaultProfile: "full-stack",
   logLevel: "info",
   historyRetentionDays: 30,

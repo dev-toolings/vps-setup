@@ -16,6 +16,12 @@ export interface ProfileComponents {
   bun: boolean;
   /** Apply security hardening */
   security: boolean;
+  /** Configure Linux users and application permissions */
+  users: boolean;
+  /** Install and configure system-wide PostgreSQL/Redis */
+  database: boolean;
+  /** Enable rebuild/export metadata */
+  rebuild: boolean;
 }
 
 /**
@@ -57,6 +63,9 @@ export const DEFAULT_COMPONENTS: ProfileComponents = {
   nvm: false,
   bun: false,
   security: false,
+  users: false,
+  database: false,
+  rebuild: false,
 };
 
 /**
@@ -70,6 +79,9 @@ export const FULL_STACK_COMPONENTS: ProfileComponents = {
   nvm: false,
   bun: true,
   security: true,
+  users: true,
+  database: true,
+  rebuild: true,
 };
 
 /**
@@ -83,6 +95,9 @@ export const MINIMAL_COMPONENTS: ProfileComponents = {
   nvm: false,
   bun: false,
   security: true,
+  users: true,
+  database: true,
+  rebuild: true,
 };
 
 /**
@@ -96,4 +111,55 @@ export const SECURITY_ONLY_COMPONENTS: ProfileComponents = {
   nvm: false,
   bun: false,
   security: true,
+  users: true,
+  database: false,
+  rebuild: true,
+};
+
+/**
+ * Local Docker profile components (local development, no VPS hardening)
+ */
+export const LOCAL_DOCKER_COMPONENTS: ProfileComponents = {
+  docker: true,
+  php_fpm: false,
+  caddy: true,
+  nodejs: true,
+  nvm: false,
+  bun: true,
+  security: false,
+  users: false,
+  database: false,
+  rebuild: false,
+};
+
+/**
+ * VPS Docker profile components (Docker apps + system-wide DB)
+ */
+export const VPS_DOCKER_COMPONENTS: ProfileComponents = {
+  docker: true,
+  php_fpm: false,
+  caddy: true,
+  nodejs: true,
+  nvm: false,
+  bun: true,
+  security: true,
+  users: true,
+  database: true,
+  rebuild: true,
+};
+
+/**
+ * VPS bare-metal profile components (system services + system-wide DB)
+ */
+export const VPS_BARE_METAL_COMPONENTS: ProfileComponents = {
+  docker: false,
+  php_fpm: true,
+  caddy: true,
+  nodejs: true,
+  nvm: false,
+  bun: true,
+  security: true,
+  users: true,
+  database: true,
+  rebuild: true,
 };

@@ -1,7 +1,7 @@
 ---
 # Docker role default variables
 
-docker_package_state: present
+docker_package_state: latest
 docker_service_state: started
 docker_service_enabled: true
 

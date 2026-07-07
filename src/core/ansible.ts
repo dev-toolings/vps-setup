@@ -21,6 +21,7 @@ export interface AnsibleRunOptions {
   verbose?: boolean;
   configFile?: string;
   playbook?: string;
+  local?: boolean;
 }
 
 /**
@@ -41,27 +42,32 @@ export class AnsibleRunner {
     const args: string[] = [];
 
     // Playbook file
-    const playbook = options.playbook || join(this.ansiblePath, "playbooks", "provision.yml");
+    const playbook = options.playbook || join(this.ansiblePath, "playbooks", "site.yml");
     args.push(playbook);
 
-    // Inventory (inline)
-    args.push("-i", `${options.host},`);
+    if (options.local) {
+      args.push("-i", "localhost,");
+      args.push("-c", "local");
+    } else {
+      // Inventory (inline)
+      args.push("-i", `${options.host},`);
 
-    // User
-    args.push("-u", options.user);
+      // User
+      args.push("-u", options.user);
 
-    // SSH options
-    const sshOptions = buildSSHTunnelOptions({
-      name: "",
-      host: options.host,
-      user: options.user,
-      port: options.port,
-      sshKey: options.sshKey,
-      createdAt: "",
-    });
+      // SSH options
+      const sshOptions = buildSSHTunnelOptions({
+        name: "",
+        host: options.host,
+        user: options.user,
+        port: options.port,
+        sshKey: options.sshKey,
+        createdAt: "",
+      });
 
-    if (sshOptions.length > 0) {
-      args.push("--ssh-common-args", sshOptions.join(" "));
+      if (sshOptions.length > 0) {
+        args.push("--ssh-common-args", sshOptions.join(" "));
+      }
     }
 
     // Tags
@@ -98,7 +104,7 @@ export class AnsibleRunner {
    */
   generateProvisionConfig(profile: Profile): string {
     const config: Record<string, unknown> = {
-      ...profile.components,
+      vps_components: profile.components,
       runtime_user: profile.runtimeUser,
     };
 
@@ -106,6 +112,32 @@ export class AnsibleRunner {
     if (profile.overrides) {
       for (const [key, value] of Object.entries(profile.overrides)) {
         config[key] = value;
+      }
+
+      const database = profile.overrides.database as
+        | { postgresql_version?: string; docker_cidrs?: string[]; apps?: unknown[]; redis_enabled?: boolean }
+        | undefined;
+      if (database) {
+        if (database.postgresql_version) config.postgresql_version = database.postgresql_version;
+        if (database.docker_cidrs) config.postgresql_docker_cidrs = database.docker_cidrs;
+        if (database.apps) config.postgresql_apps = database.apps;
+        if (database.redis_enabled !== undefined) config.redis_enabled = database.redis_enabled;
+      }
+
+      const users = profile.overrides.users as
+        | { deploy_user?: string; app_users?: unknown[] }
+        | undefined;
+      if (users) {
+        if (users.deploy_user) {
+          config.deploy_user = users.deploy_user;
+          config.app_group = users.deploy_user;
+        }
+        if (users.app_users) config.app_users = users.app_users;
+      }
+
+      const rebuild = profile.overrides.rebuild as { vault_file?: string } | undefined;
+      if (rebuild?.vault_file) {
+        config.rebuild_vault_file = rebuild.vault_file;
       }
     }
 
@@ -156,6 +188,7 @@ export class AnsibleRunner {
         verbose: options.verbose,
         configFile,
         playbook: options.playbook,
+        local: options.local,
       });
 
       debug(`Running: ansible-playbook ${args.join(" ")}`);
@@ -164,6 +197,11 @@ export class AnsibleRunner {
       // Execute
       const result = await execa("ansible-playbook", args, {
         timeout: 600000, // 10 minutes timeout
+        cwd: this.ansiblePath,
+        env: {
+          ...process.env,
+          ANSIBLE_CONFIG: join(this.ansiblePath, "ansible.cfg"),
+        },
       });
 
       const output = result.stdout || "";
@@ -171,7 +209,7 @@ export class AnsibleRunner {
 
       return {
         ...parsed,
-        duration: Date.now() - startTime,
+        duration: Math.round((Date.now() - startTime) / 1000),
         output,
       };
     } catch (err) {
@@ -185,7 +223,7 @@ export class AnsibleRunner {
       return {
         ...parsed,
         success: false,
-        duration: Date.now() - startTime,
+        duration: Math.round((Date.now() - startTime) / 1000),
         output,
         error: errorMessage,
       };
@@ -254,6 +292,6 @@ export class AnsibleRunner {
    * Check if ansible path exists
    */
   checkAnsiblePath(): boolean {
-    return existsSync(join(this.ansiblePath, "playbooks", "provision.yml"));
+    return existsSync(join(this.ansiblePath, "playbooks", "site.yml"));
   }
 }

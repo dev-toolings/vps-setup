@@ -1,0 +1,15 @@
+---
+postgresql_version: latest
+postgresql_port: 5432
+postgresql_listen_addresses:
+  - "127.0.0.1"
+  - "172.17.0.1"
+postgresql_docker_cidrs:
+  - "172.17.0.0/16"
+postgresql_auth_method: scram-sha-256
+postgresql_apps: []
+redis_enabled: true
+redis_package_state: latest
+redis_bind_addresses:
+  - "127.0.0.1"
+database_compose_snippet_dir: /srv/infrastructure/compose.d

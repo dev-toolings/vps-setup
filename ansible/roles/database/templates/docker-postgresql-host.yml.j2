@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# Compose extension for Docker apps that use the system-wide PostgreSQL service.
+#
+# Usage:
+# services:
+#   app:
+#     <<: *postgres-host
+#     environment:
+#       DATABASE_HOST: host.docker.internal
+#       DATABASE_PORT: "{{ postgresql_port }}"
+
+x-postgres-host: &postgres-host
+  extra_hosts:
+    - "host.docker.internal:host-gateway"

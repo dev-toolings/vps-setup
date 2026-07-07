@@ -33,13 +33,16 @@ export const ServerSchema = z.object({
  * Profile components validation schema
  */
 export const ProfileComponentsSchema = z.object({
-  docker: z.boolean(),
-  php_fpm: z.boolean(),
-  caddy: z.boolean(),
-  nodejs: z.boolean(),
-  nvm: z.boolean(),
-  bun: z.boolean(),
-  security: z.boolean(),
+  docker: z.boolean().default(false),
+  php_fpm: z.boolean().default(false),
+  caddy: z.boolean().default(false),
+  nodejs: z.boolean().default(false),
+  nvm: z.boolean().default(false),
+  bun: z.boolean().default(false),
+  security: z.boolean().default(false),
+  users: z.boolean().default(false),
+  database: z.boolean().default(false),
+  rebuild: z.boolean().default(false),
 });
 
 /**
@@ -73,7 +76,7 @@ export const ConfigSchema = z.object({
   ansiblePath: z.string(),
   defaultProfile: z.string().optional(),
   logLevel: z.enum(["debug", "info", "warn", "error"]).optional(),
-  historyRetentionDays: z.number().int().min(1).max(365).optional(),
+  historyRetentionDays: z.number().int().min(0).max(365).optional(),
 });
 
 /**

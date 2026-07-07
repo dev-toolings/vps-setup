@@ -1,0 +1,12 @@
+---
+deploy_user: deploy
+deploy_user_shell: /bin/bash
+deploy_user_groups:
+  - sudo
+deploy_user_copy_authorized_keys: true
+deploy_user_authorized_keys_source: "~{{ ansible_user | default('root') }}/.ssh/authorized_keys"
+deploy_user_authorized_keys: []
+deploy_user_passwordless_sudo: true
+app_base_dir: /srv/apps
+app_group: "{{ deploy_user }}"
+app_users: []

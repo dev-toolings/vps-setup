@@ -5,7 +5,9 @@
   ansible.builtin.systemd:
     name: docker
     state: restarted
+  when: docker_runtime_available | default(true)
 
 - name: Reload UFW after Docker
   community.general.ufw:
     state: reloaded
+  when: ufw_runtime_available | default(true)
