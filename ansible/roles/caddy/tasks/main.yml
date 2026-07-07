@@ -72,6 +72,7 @@
     mode: '0755'
   loop:
     - /etc/caddy
+    - "{{ caddy_sites_dir }}"
     - /var/log/caddy
     - /var/lib/caddy/.local/share/caddy
 
@@ -111,3 +112,16 @@
   when:
     - caddy_runtime_available
     - not ansible_check_mode
+
+- name: Ensure application base directory exists
+  ansible.builtin.file:
+    path: "{{ app_base_dir }}"
+    state: directory
+
+- name: Deploy Docker-app deployment convention (CLAUDE.md)
+  ansible.builtin.template:
+    src: apps-CLAUDE.md.j2
+    dest: "{{ app_base_dir }}/CLAUDE.md"
+    owner: root
+    group: root
+    mode: "0644"

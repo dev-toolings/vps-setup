@@ -3,14 +3,20 @@
 
 # Global options
 {
-    admin off
+    # Admin API stays enabled (loopback-only :2019, blocked by UFW) because
+    # `systemctl reload caddy` drives it — disabling it breaks every reload,
+    # which is exactly how apps are added (drop a site file, reload).
     email {{ caddy_email }}
     acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 
 {% for site in caddy_sites %}
 # Site: {{ site.name }}
-{{ site.domains | join(', ') }} {
+{# An IP address can't get an ACME cert (Let's Encrypt rejects IP identifiers),
+   so IP/http_only sites are served over HTTP and skip TLS/auto-HTTPS entirely.
+   IPs are auto-detected so a reload never fails on a cert it can never obtain. #}
+{% set http_only = site.http_only | default(false) or (site.domains[0] | regex_search('^[0-9]{1,3}(\.[0-9]{1,3}){3}$')) %}
+{% if http_only %}{{ site.domains | map('regex_replace', '^', 'http://') | join(', ') }}{% else %}{{ site.domains | join(', ') }}{% endif %} {
     root * {{ site.root }}
 
     {% if site.encode | default(true) %}
@@ -67,6 +73,10 @@
 }
 
 {% endfor %}
+
+# Per-app reverse-proxy sites. Each Docker app drops its own <app>.caddy here.
+# Convention documented in {{ app_base_dir | default('/srv/apps') }}/CLAUDE.md
+import {{ caddy_sites_dir }}/*.caddy
 
 # Health check endpoint
 :8080 {

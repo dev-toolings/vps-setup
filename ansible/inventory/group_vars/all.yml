@@ -116,6 +116,9 @@ caddy_sites:
     log_file: "/var/log/caddy/default.log"
     php_max_execution_time: 60
     php_memory_limit: "256M"
+    # Bound to the bare IP -> no ACME cert possible; serve over HTTP so reloads
+    # never fail. Real apps add their own HTTPS domain in /etc/caddy/sites/.
+    http_only: true
 
 # -------------------------------------------
 # Runtime User (for NVM/Bun)

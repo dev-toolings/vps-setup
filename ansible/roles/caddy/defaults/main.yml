@@ -2,6 +2,11 @@
 # Caddy role default variables
 
 caddy_email: "admin@example.com"
+
+# Directory of per-app reverse-proxy site files (<app>.caddy) imported by the
+# global Caddyfile. One Docker app == one file here. See /srv/apps/CLAUDE.md.
+caddy_sites_dir: "/etc/caddy/sites"
+app_base_dir: "/srv/apps"
 caddy_sites:
   - name: "default"
     domains:
@@ -10,6 +15,9 @@ caddy_sites:
     php: true
     encode: true
     log_file: "/var/log/caddy/default.log"
+    # Default site is bound to the bare IP, which cannot obtain an ACME cert;
+    # serve it over HTTP so reloads never fail on a cert it can never get.
+    http_only: true
 
 # PHP integration
 php_fpm_socket: "/run/php/php{{ php_version | default('8.2') }}-fpm.sock"
