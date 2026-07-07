@@ -6,7 +6,9 @@
   },
   "storage-driver": "{{ docker_storage_driver }}",
   "iptables": true,
-  "live-restore": true,
+  "bip": "{{ docker_bip }}",
+  "live-restore": {{ (false if (vps_components.swarm | default(false)) else (docker_live_restore | default(true))) | to_json }},
+  "default-address-pools": {{ docker_default_address_pools | to_json }},
   "default-ulimits": {
     "nofile": {
       "Name": "nofile",

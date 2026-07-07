@@ -1,0 +1,103 @@
+---
+# Docker Swarm — single-node manager + deterministic docker_gwbridge.
+# Runs AFTER the docker role and BEFORE the database role: PostgreSQL binds the
+# gwbridge gateway, so that bridge must exist with a known subnet first.
+
+- name: Read Docker Swarm state
+  ansible.builtin.command: "docker info --format '{% raw %}{{ .Swarm.LocalNodeState }}{% endraw %}'"
+  register: swarm_info
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Set swarm facts
+  ansible.builtin.set_fact:
+    swarm_docker_available: "{{ swarm_info.rc == 0 }}"
+    swarm_active: "{{ (swarm_info.stdout | default('') | trim) == 'active' }}"
+
+- name: Explain skipped swarm tasks when Docker is unavailable
+  ansible.builtin.debug:
+    msg: "Docker is not available; swarm init and gwbridge setup are skipped."
+  when: not swarm_docker_available
+
+- name: Check docker_gwbridge network
+  ansible.builtin.command: docker network inspect docker_gwbridge
+  register: gwbridge_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: swarm_docker_available
+
+- name: Pre-create pinned docker_gwbridge
+  # Only before init: swarm adopts this pre-created bridge instead of picking a
+  # random 172.18.x, guaranteeing the gateway used by pg_hba/UFW config.
+  ansible.builtin.command: >-
+    docker network create
+    --subnet {{ swarm_gwbridge_subnet }}
+    --gateway {{ swarm_gwbridge_gateway }}
+    -o com.docker.network.bridge.name=docker_gwbridge
+    -o com.docker.network.bridge.enable_icc={{ swarm_gwbridge_enable_icc | string | lower }}
+    -o com.docker.network.bridge.enable_ip_masquerade={{ swarm_gwbridge_ip_masquerade | string | lower }}
+    docker_gwbridge
+  changed_when: true
+  when:
+    - swarm_docker_available
+    - not swarm_active
+    - gwbridge_probe.rc != 0
+    - not ansible_check_mode
+
+- name: Initialize Docker Swarm
+  ansible.builtin.command: >-
+    docker swarm init
+    --advertise-addr {{ swarm_advertise_addr }}
+    --listen-addr {{ swarm_advertise_addr }}
+  register: swarm_init
+  changed_when: swarm_init.rc == 0
+  failed_when:
+    - swarm_init.rc != 0
+    - "'already part of a swarm' not in (swarm_init.stderr | default(''))"
+  when:
+    - swarm_docker_available
+    - not swarm_active
+    - not ansible_check_mode
+
+- name: Gather IPv4 interface addresses
+  ansible.builtin.command: ip -o -4 addr show
+  register: swarm_ip_addr
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: swarm_docker_available
+
+- name: Assert docker_gwbridge gateway is live
+  # Guards the database role that follows: binding PostgreSQL to an address not
+  # assigned to any interface makes it refuse to start. Turn a silent crash into
+  # an actionable message.
+  ansible.builtin.assert:
+    that:
+      - swarm_gwbridge_gateway in (swarm_ip_addr.stdout | default(''))
+    fail_msg: >-
+      docker_gwbridge gateway {{ swarm_gwbridge_gateway }} is not present on any
+      interface. A docker_gwbridge with a different subnet likely already exists.
+      Fix manually (DESTRUCTIVE, drops all services):
+      `docker swarm leave --force && docker network rm docker_gwbridge` then re-run.
+    success_msg: "docker_gwbridge gateway {{ swarm_gwbridge_gateway }} is live."
+  when:
+    - swarm_docker_available
+    - not ansible_check_mode
+
+- name: Deny Swarm plane ports at UFW (defense-in-depth)
+  community.general.ufw:
+    rule: deny
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    comment: "Swarm plane (loopback only)"
+  loop:
+    - { port: "2377", proto: tcp }
+    - { port: "7946", proto: tcp }
+    - { port: "7946", proto: udp }
+    - { port: "4789", proto: udp }
+  when:
+    - swarm_firewall_deny_plane | default(true)
+    - vps_components.security | default(false)
+    - not (ansible_check_mode and not (ufw_runtime_available | default(false)))

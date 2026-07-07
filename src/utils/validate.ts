@@ -42,6 +42,7 @@ export const ProfileComponentsSchema = z.object({
   security: z.boolean().default(false),
   users: z.boolean().default(false),
   database: z.boolean().default(false),
+  swarm: z.boolean().default(false),
   rebuild: z.boolean().default(false),
 });
 

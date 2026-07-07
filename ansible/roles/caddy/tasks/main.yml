@@ -63,6 +63,53 @@
     - ansible_check_mode
     - not caddy_runtime_available
 
+- name: Check installed Caddy modules
+  ansible.builtin.command: caddy list-modules
+  register: caddy_modules
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when:
+    - caddy_runtime_available
+    - caddy_cloudflare | bool
+
+- name: Install a Caddy build with the Cloudflare DNS module
+  # Pre-built by the official download API (no Go/xcaddy needed on the host).
+  ansible.builtin.get_url:
+    url: "https://caddyserver.com/api/download?os=linux&arch={{ caddy_download_arch }}&p=github.com/caddy-dns/cloudflare"
+    dest: /usr/bin/caddy
+    mode: "0755"
+    force: true
+  notify: Restart Caddy
+  when:
+    - caddy_runtime_available
+    - caddy_cloudflare | bool
+    - "'dns.providers.cloudflare' not in (caddy_modules.stdout | default(''))"
+    - not ansible_check_mode
+
+- name: Hold the caddy package so apt upgrades keep the Cloudflare build
+  ansible.builtin.dpkg_selections:
+    name: caddy
+    selection: hold
+  when:
+    - caddy_cloudflare | bool
+    - not ansible_check_mode
+
+- name: Ensure Caddy systemd drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/caddy.service.d
+    state: directory
+    mode: "0755"
+
+- name: Configure Caddy systemd overrides (runtime dir + socket reload)
+  ansible.builtin.template:
+    src: caddy-override.conf.j2
+    dest: /etc/systemd/system/caddy.service.d/override.conf
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart Caddy
+
 - name: Create Caddy directories
   ansible.builtin.file:
     path: "{{ item }}"

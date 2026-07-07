@@ -15,6 +15,7 @@ vps_components:
   # lockout. Never ship security:true with users:false.
   users: true
   database: false
+  swarm: false
   rebuild: false
 
 runtime_user: "{{ ansible_user | default('root') }}"

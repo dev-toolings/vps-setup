@@ -1,0 +1,141 @@
+---
+# Caddy-in-Swarm edge (Cloudflare). Runs after the swarm role (swarm must be
+# active and docker_gwbridge pinned). Gated by caddy_swarm_enabled.
+
+- name: Read Docker Swarm state
+  ansible.builtin.command: "docker info --format '{% raw %}{{ .Swarm.LocalNodeState }}{% endraw %}'"
+  register: cs_swarm_info
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Fail early if swarm is not active
+  ansible.builtin.fail:
+    msg: "caddy_swarm requires an active Docker Swarm. Enable the 'swarm' component first."
+  when:
+    - (cs_swarm_info.stdout | default('') | trim) != 'active'
+    - not ansible_check_mode
+
+- name: Stop the host Caddy service (the in-swarm edge owns 80/443)
+  ansible.builtin.systemd:
+    name: caddy
+    state: stopped
+    enabled: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Create /opt/caddy structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ caddy_swarm_opt_dir }}"
+    - "{{ caddy_swarm_opt_dir }}/conf.d"
+    - "{{ caddy_swarm_opt_dir }}/logs"
+
+- name: Template Dockerfile (Caddy + Cloudflare)
+  ansible.builtin.template:
+    src: Dockerfile.caddy-cloudflare.j2
+    dest: "{{ caddy_swarm_opt_dir }}/Dockerfile"
+    mode: "0644"
+  register: cs_dockerfile
+
+- name: Template edge Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.edge.j2
+    dest: "{{ caddy_swarm_opt_dir }}/Caddyfile"
+    mode: "0644"
+  register: cs_caddyfile
+
+- name: Template caddy stack file
+  ansible.builtin.template:
+    src: caddy-stack.yml.j2
+    dest: "{{ caddy_swarm_opt_dir }}/stack.yml"
+    mode: "0644"
+  register: cs_stackfile
+
+- name: Check whether the Cloudflare image exists
+  ansible.builtin.command: "docker images -q {{ caddy_swarm_image }}"
+  register: cs_image
+  changed_when: false
+  check_mode: false
+
+- name: Build the Caddy Cloudflare image
+  ansible.builtin.command: "docker build -t {{ caddy_swarm_image }} {{ caddy_swarm_opt_dir }}"
+  register: cs_build
+  changed_when: true
+  when:
+    - cs_dockerfile.changed or (cs_image.stdout | default('') | length == 0)
+    - not ansible_check_mode
+
+- name: Ensure the shared attachable overlay network exists
+  ansible.builtin.command: "docker network create --driver overlay --attachable {{ caddy_swarm_network }}"
+  register: cs_net
+  changed_when: cs_net.rc == 0
+  failed_when:
+    - cs_net.rc != 0
+    - "'already exists' not in (cs_net.stderr | default(''))"
+  when: not ansible_check_mode
+
+- name: Check whether the caddy service exists
+  ansible.builtin.command: "docker service ls --filter name={{ caddy_swarm_stack_name }}_caddy -q"
+  register: cs_service
+  changed_when: false
+  check_mode: false
+
+- name: Deploy the caddy edge stack
+  ansible.builtin.command: "docker stack deploy -c {{ caddy_swarm_opt_dir }}/stack.yml {{ caddy_swarm_stack_name }}"
+  changed_when: true
+  when:
+    - cs_stackfile.changed or cs_build.changed or (cs_service.stdout | default('') | length == 0)
+    - not ansible_check_mode
+
+- name: Force caddy service update after an image rebuild
+  ansible.builtin.command: "docker service update --force {{ caddy_swarm_stack_name }}_caddy"
+  changed_when: true
+  when:
+    - cs_build.changed
+    - (cs_service.stdout | default('') | length > 0)
+    - not ansible_check_mode
+
+- name: Hot-reload caddy config when only the Caddyfile changed
+  ansible.builtin.shell: |
+    set -e
+    cid=$(docker ps -qf "name={{ caddy_swarm_stack_name }}_caddy" | head -1)
+    [ -n "$cid" ] && docker exec "$cid" caddy reload --config /etc/caddy/Caddyfile || true
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when:
+    - cs_caddyfile.changed
+    - not cs_build.changed
+    - (cs_service.stdout | default('') | length > 0)
+    - not ansible_check_mode
+
+- name: Install a convenience reload helper
+  ansible.builtin.copy:
+    dest: /usr/local/bin/caddy-reload
+    mode: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Hot-reload the in-swarm Caddy edge (no restart) after editing conf.d/.
+      set -euo pipefail
+      cid=$(docker ps -qf "name={{ caddy_swarm_stack_name }}_caddy" | head -1)
+      [ -n "$cid" ] || { echo "caddy edge container not found"; exit 1; }
+      docker exec "$cid" caddy validate --config /etc/caddy/Caddyfile
+      docker exec "$cid" caddy reload --config /etc/caddy/Caddyfile
+      echo "caddy reloaded (no restart)"
+
+- name: Ensure application base directory exists
+  ansible.builtin.file:
+    path: "{{ app_base_dir | default('/srv/apps') }}"
+    state: directory
+
+- name: Deploy the Swarm app deployment convention (CLAUDE.md)
+  ansible.builtin.template:
+    src: swarm-apps-CLAUDE.md.j2
+    dest: "{{ app_base_dir | default('/srv/apps') }}/CLAUDE.md"
+    owner: root
+    group: root
+    mode: "0644"

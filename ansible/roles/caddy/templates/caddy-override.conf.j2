@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+[Service]
+# Provide /run/caddy (tmpfs, owned by the caddy user) for the admin unix socket.
+RuntimeDirectory=caddy
+RuntimeDirectoryMode=0755
+# Reload config via the unix admin socket (admin is not on TCP) — no restart,
+# so adding a project (a new sites/*.caddy file) never bounces Caddy.
+ExecReload=
+ExecReload=/usr/bin/caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile --force --address unix/{{ caddy_admin_socket }}
+{% if caddy_cloudflare %}
+# Optional Cloudflare API token for DNS-01 (file absent -> ignored).
+EnvironmentFile=-{{ caddy_cloudflare_env_file }}
+{% endif %}

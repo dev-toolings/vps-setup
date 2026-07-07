@@ -3,9 +3,9 @@
 
 # Global options
 {
-    # Admin API stays enabled (loopback-only :2019, blocked by UFW) because
-    # `systemctl reload caddy` drives it — disabling it breaks every reload,
-    # which is exactly how apps are added (drop a site file, reload).
+    # Admin API on a unix socket only: not reachable over the network, but
+    # `systemctl reload` still drives it to hot-reload config without a restart.
+    admin unix/{{ caddy_admin_socket }}
     email {{ caddy_email }}
     acme_ca https://acme-v02.api.letsencrypt.org/directory
 }

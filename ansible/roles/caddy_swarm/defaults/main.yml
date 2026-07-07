@@ -1,0 +1,15 @@
+---
+# Caddy-in-Swarm edge (Cloudflare) role defaults
+
+caddy_swarm_enabled: false
+caddy_swarm_stack_name: caddy
+caddy_swarm_image: "caddy-cloudflare:latest"
+# Shared attachable overlay: app stacks join this so Caddy proxies them by name.
+caddy_swarm_network: "edge"
+caddy_swarm_opt_dir: "/opt/caddy"
+caddy_swarm_email: "{{ caddy_email | default('admin@example.com') }}"
+caddy_swarm_http_port: 80
+caddy_swarm_https_port: 443
+# Base images for the local Cloudflare build.
+caddy_swarm_builder_image: "caddy:2-builder"
+caddy_swarm_runtime_image: "caddy:2"

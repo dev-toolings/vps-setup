@@ -17,6 +17,7 @@ export {
   LOCAL_DOCKER_COMPONENTS,
   VPS_DOCKER_COMPONENTS,
   VPS_BARE_METAL_COMPONENTS,
+  VPS_SWARM_COMPONENTS,
 } from "./profile.ts";
 
 // Config types

@@ -1,28 +1,26 @@
-# CLAUDE.md — Déploiement d'apps Docker sur ce VPS
+# CLAUDE.md — Déploiement d'apps Docker sur ce VPS (classic)
 
 > {{ ansible_managed }}
 > Fichier de convention généré par vps-setup. À lire AVANT de déployer toute app.
-> Architecture : **Caddy global (systemd) en frontal unique + apps dockérisées derrière.**
+> Architecture : **Caddy system-wide (hôte) en frontal unique + apps Docker Compose derrière.**
 
-Ce VPS applique un pattern strict : un seul Caddy (hôte) possède les ports `:80`/`:443`
-et termine le TLS. Chaque app tourne en Docker, **n'expose rien publiquement**, et Caddy
-lui sert de reverse proxy. PostgreSQL et Redis sont installés system-wide sur l'hôte
-(pas en conteneur).
+Ce VPS applique un pattern strict : un seul Caddy (hôte, systemd) possède `:80`/`:443` et
+termine le TLS. Chaque app tourne en **docker compose**, **n'expose rien publiquement**
+(bind loopback), et Caddy lui sert de reverse proxy. PostgreSQL et Redis sont system-wide
+sur l'hôte.
 
-En prod ici, **il n'y a pas de services `infra-*` ni de réseau `dev-shared-net`** (ça,
-c'est la machine de dev). Utilise le PostgreSQL de l'hôte.
+En prod ici, **pas de services `infra-*` ni de réseau `dev-shared-net`** (machine de dev).
+Utilise le PostgreSQL de l'hôte. (Pour le mode Docker Swarm, voir le profil `vps-swarm`.)
 
 ---
 
 ## Règles obligatoires (une app = ces 3 étapes)
 
 ### 1. Emplacement
-Chaque app vit dans son dossier : `{{ app_base_dir }}/<app>/` (avec son `docker-compose.yml`
-et son `.env` **non commité**).
+Chaque app vit dans `{{ app_base_dir }}/<app>/` avec son `docker-compose.yml` et son `.env`
+**non commité**.
 
-### 2. Publication réseau — JAMAIS `0.0.0.0`
-L'app publie **uniquement sur la loopback** de l'hôte. Caddy est le seul point d'entrée.
-
+### 2. Publication réseau — bind loopback, JAMAIS `0.0.0.0`
 ```yaml
 # {{ app_base_dir }}/<app>/docker-compose.yml
 services:
@@ -30,101 +28,54 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:<PORT>:<PORT_INTERNE>"   # ✅ loopback only
-      # - "<PORT>:<PORT_INTERNE>"           # ❌ INTERDIT : expose l'app sur Internet
+      # - "<PORT>:<PORT_INTERNE>"           # ❌ INTERDIT : expose sur Internet
 ```
+- `<PORT>` hôte libre (convention `>= 8000`).
+- Jamais `network_mode: host` sauf raison précise.
 
-- Choisis un `<PORT>` hôte libre (convention : `>= 8000`).
-- Ne mets jamais `network_mode: host` sauf raison précise et justifiée.
-- UFW n'ouvre que `22/80/443` ; la règle `DOCKER-USER` filtre aussi les ports publiés par
-  Docker — mais on ne s'appuie pas dessus : **on bind loopback, point.**
-
-### 3. Reverse proxy — un fichier par app
-Crée `{{ caddy_sites_dir }}/<app>.caddy` (importé automatiquement par le Caddyfile global) :
-
+### 3. Reverse proxy — un fichier par app (rechargé SANS restart)
 ```caddyfile
 # {{ caddy_sites_dir }}/<app>.caddy
 app.mondomaine.com {
     reverse_proxy 127.0.0.1:<PORT>
 }
 ```
-
-Puis valide et recharge (jamais `restart`, toujours `reload`) :
-
 ```bash
 sudo caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile
-sudo systemctl reload caddy
+sudo systemctl reload caddy    # hot-reload via le socket admin, AUCUN restart
 ```
-
-Le **TLS est automatique** (Let's Encrypt) dès qu'un vrai domaine pointe (A/AAAA) sur ce VPS.
-Pas de gestion manuelle de certificat.
+TLS automatique (Let's Encrypt HTTP-01). Le module **Cloudflare** est présent : pour du
+wildcard / DNS-01, ajoute `tls { dns cloudflare {env.CF_API_TOKEN} }` et dépose le token dans
+`/etc/vps-setup/secrets/caddy-cloudflare.env`.
 
 ---
 
 ## Accès aux données de l'hôte depuis un conteneur
+Les conteneurs compose sortent via `docker0` (`172.17.0.1`).
 
-### PostgreSQL — OK, via la gateway du bridge Docker
-L'hôte écoute sur `172.17.0.1:{{ postgresql_port | default(5432) }}` et `pg_hba` autorise
-`172.17.0.0/16` (auth `scram-sha-256`). Depuis le conteneur :
-
-```env
-# .env de l'app
-DATABASE_URL=postgresql://<app_user>:<pass>@172.17.0.1:{{ postgresql_port | default(5432) }}/<app_db>
-```
-
-Crée un rôle + une base **dédiés par app** (jamais le superuser `postgres`) :
-
-```bash
-sudo -u postgres createuser --pwprompt <app_user>
-sudo -u postgres createdb --owner=<app_user> <app_db>
-```
-
-### Redis — protégé par mot de passe, loopback par défaut
-Le Redis de l'hôte a un **`requirepass`** (mot de passe) et bind **`127.0.0.1`
-uniquement**. Le mot de passe est stocké sur l'hôte (root only) :
-
-```bash
-sudo cat /etc/vps-setup/secrets/redis.pass
-```
-
-**Deux usages possibles :**
-
-1. **Cache isolé par app (recommandé)** — embarque un Redis dans le compose de l'app
-   (jetable, aucune coordination de secret) :
-   ```yaml
-   services:
-     redis:
-       image: redis:8-alpine
-       restart: unless-stopped
-       # pas de ports: -> joignable seulement par 'app' sur le réseau du compose
-   ```
-
-2. **Redis hôte partagé depuis Docker** — ajoute la gateway au bind puis pointe l'app
-   dessus avec le mot de passe :
-   ```bash
-   # sur l'hôte : autoriser l'accès depuis le bridge Docker
-   sudo sed -i 's/^bind .*/bind 127.0.0.1 172.17.0.1/' /etc/redis/redis.conf
-   sudo systemctl restart redis-server
-   ```
-   ```env
-   # .env de l'app
-   REDIS_URL=redis://:<mot_de_passe>@172.17.0.1:6379/0
-   ```
-   (Ne jamais exposer Redis sans `requirepass` ni au-delà de la loopback/gateway.)
+- **PostgreSQL** : `postgresql://<user>:<pass>@172.17.0.1:{{ postgresql_port | default(5432) }}/<db>`
+  (pg_hba autorise `172.17.0.0/16`, auth scram). Rôle + base dédiés par app :
+  ```bash
+  sudo -u postgres createuser --pwprompt <app_user>
+  sudo -u postgres createdb --owner=<app_user> <app_db>
+  ```
+- **Redis** : `requirepass` actif (`sudo cat /etc/vps-setup/secrets/redis.pass`), bind loopback.
+  Préfère un **Redis sidecar** dans le compose de l'app (cache jetable, aucun secret partagé).
 
 ---
 
-## Checklist avant de dire « déployé »
-- [ ] Dossier `{{ app_base_dir }}/<app>/`, `.env` présent et **non commité**
+## Checklist
+- [ ] `{{ app_base_dir }}/<app>/`, `.env` non commité
 - [ ] `docker-compose.yml` : ports en `127.0.0.1:<PORT>:...`, `restart: unless-stopped`
 - [ ] `{{ caddy_sites_dir }}/<app>.caddy` créé, `caddy validate` OK, `systemctl reload caddy`
-- [ ] DB : rôle + base dédiés (si PostgreSQL), URL sur `172.17.0.1`
-- [ ] `docker compose up -d` puis vérifié : `curl -I https://app.mondomaine.com`
-- [ ] Aucun port applicatif visible en `0.0.0.0` : `sudo ss -ltnp | grep -v 127.0.0.1`
+- [ ] DB : rôle + base dédiés, URL sur `172.17.0.1`
+- [ ] `docker compose up -d` puis `curl -I https://app.mondomaine.com` → 200
+- [ ] Aucun port app public : `sudo ss -ltnp | grep -vE '127.0.0.1|::1'`
 
-## Commandes utiles
+## Commandes
 ```bash
-cd {{ app_base_dir }}/<app> && docker compose up -d     # démarrer
-docker compose logs -f                                  # logs
-docker compose pull && docker compose up -d             # mettre à jour
-sudo ss -ltnp | grep -vE '127.0.0.1|::1'                # audit exposition publique
+cd {{ app_base_dir }}/<app> && docker compose up -d
+docker compose logs -f
+docker compose pull && docker compose up -d
+sudo ss -ltnp | grep -vE '127.0.0.1|::1'      # audit exposition publique
 ```

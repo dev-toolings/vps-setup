@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+# Caddy edge stack. Deploy: docker stack deploy -c stack.yml {{ caddy_swarm_stack_name }}
+services:
+  caddy:
+    image: {{ caddy_swarm_image }}
+    ports:
+      - { target: 80, published: {{ caddy_swarm_http_port }}, mode: host }
+      - { target: 443, published: {{ caddy_swarm_https_port }}, mode: host }
+      - { target: 443, published: {{ caddy_swarm_https_port }}, protocol: udp, mode: host }
+    volumes:
+      - {{ caddy_swarm_opt_dir }}/Caddyfile:/etc/caddy/Caddyfile:ro
+      - {{ caddy_swarm_opt_dir }}/conf.d:/etc/caddy/conf.d:ro
+      - {{ caddy_swarm_opt_dir }}/logs:/var/log/caddy
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - {{ caddy_swarm_network }}
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  {{ caddy_swarm_network }}:
+    external: true

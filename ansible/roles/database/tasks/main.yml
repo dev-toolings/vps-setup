@@ -127,11 +127,49 @@
   changed_when: false
   when: postgresql_runtime_available
 
+- name: Compute effective PostgreSQL/Redis network exposure
+  # Only add the pinned docker_gwbridge gateway/CIDR when the swarm component is
+  # enabled (the swarm role runs first and guarantees the interface exists).
+  ansible.builtin.set_fact:
+    postgresql_listen_effective: >-
+      {{ postgresql_listen_addresses
+         + ([swarm_gwbridge_gateway | default('172.18.0.1')] if _swarm_on else []) }}
+    postgresql_cidrs_effective: >-
+      {{ postgresql_docker_cidrs
+         + ([swarm_gwbridge_subnet | default('172.18.0.0/16')] if _swarm_on else []) }}
+    redis_bind_effective: >-
+      {{ redis_bind_addresses
+         + ([swarm_gwbridge_gateway | default('172.18.0.1')]
+            if (_swarm_on and (redis_expose_to_swarm | default(false))) else []) }}
+  vars:
+    _swarm_on: "{{ vps_components.swarm | default(false) }}"
+
+- name: Gather IPv4 interface addresses (bind guard)
+  ansible.builtin.command: ip -o -4 addr show
+  register: db_ip_addr
+  changed_when: false
+  check_mode: false
+  when: postgresql_runtime_available
+
+- name: Assert every PostgreSQL listen address is a live interface
+  # Binding PostgreSQL to an address not on any interface makes it refuse to
+  # start. This converts that silent failure into an actionable message.
+  ansible.builtin.assert:
+    that:
+      - item == '0.0.0.0' or item in (db_ip_addr.stdout | default(''))
+    fail_msg: >-
+      PostgreSQL listen address {{ item }} is not present on any interface.
+      If this is the docker_gwbridge gateway, run the `swarm` role first.
+  loop: "{{ postgresql_listen_effective }}"
+  when:
+    - postgresql_runtime_available
+    - not ansible_check_mode
+
 - name: Configure PostgreSQL listen addresses
   ansible.builtin.lineinfile:
     path: "{{ postgresql_config_file.stdout }}"
     regexp: "^#?listen_addresses\\s*="
-    line: "listen_addresses = '{{ postgresql_listen_addresses | join(',') }}'"
+    line: "listen_addresses = '{{ postgresql_listen_effective | join(',') }}'"
   notify: Restart PostgreSQL
   when: postgresql_runtime_available
 
@@ -156,7 +194,7 @@
     path: "{{ postgresql_hba_file.stdout }}"
     line: "host all all {{ item }} {{ postgresql_auth_method }}"
     state: present
-  loop: "{{ postgresql_docker_cidrs }}"
+  loop: "{{ postgresql_cidrs_effective }}"
   notify: Restart PostgreSQL
   when: postgresql_runtime_available
 
@@ -167,7 +205,7 @@
     to_port: "{{ postgresql_port }}"
     proto: tcp
     comment: "PostgreSQL from Docker"
-  loop: "{{ postgresql_docker_cidrs }}"
+  loop: "{{ postgresql_cidrs_effective }}"
   when:
     - vps_components.security | default(false)
     - not (ansible_check_mode and not (ufw_runtime_available | default(false)))
@@ -333,11 +371,27 @@
   ansible.builtin.lineinfile:
     path: /etc/redis/redis.conf
     regexp: "^bind "
-    line: "bind {{ redis_bind_addresses | join(' ') }}"
+    line: "bind {{ redis_bind_effective | join(' ') }}"
   notify: Restart Redis
   when:
     - redis_enabled | bool
     - redis_runtime_available | default(false)
+
+- name: Allow swarm CIDR through UFW to Redis
+  # Only when Redis is deliberately exposed to swarm tasks (requires requirepass).
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ swarm_gwbridge_subnet | default('172.18.0.0/16') }}"
+    to_port: "{{ redis_port | default(6379) }}"
+    proto: tcp
+    comment: "Redis from swarm"
+  when:
+    - redis_enabled | bool
+    - redis_expose_to_swarm | default(false)
+    - vps_components.swarm | default(false)
+    - vps_components.security | default(false)
+    - redis_effective_password | default('') | length > 0
+    - not (ansible_check_mode and not (ufw_runtime_available | default(false)))
 
 - name: Ensure Redis service is running
   ansible.builtin.systemd:

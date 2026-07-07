@@ -149,6 +149,7 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
       { value: "security", label: "Security Hardening", selected: profile.components.security },
       { value: "users", label: "Users + Permissions", selected: profile.components.users },
       { value: "database", label: "PostgreSQL + Redis", selected: profile.components.database },
+      { value: "swarm", label: "Docker Swarm", selected: profile.components.swarm },
       { value: "rebuild", label: "Rebuild Metadata", selected: profile.components.rebuild },
     ],
   });
@@ -166,6 +167,7 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
     security: selectedComponentNames.includes("security"),
     users: selectedComponentNames.includes("users"),
     database: selectedComponentNames.includes("database"),
+    swarm: selectedComponentNames.includes("swarm"),
     rebuild: selectedComponentNames.includes("rebuild"),
   };
 

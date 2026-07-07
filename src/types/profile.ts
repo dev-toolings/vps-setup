@@ -20,6 +20,8 @@ export interface ProfileComponents {
   users: boolean;
   /** Install and configure system-wide PostgreSQL/Redis */
   database: boolean;
+  /** Initialize Docker Swarm (single-node manager) + deterministic networking */
+  swarm: boolean;
   /** Enable rebuild/export metadata */
   rebuild: boolean;
 }
@@ -65,6 +67,7 @@ export const DEFAULT_COMPONENTS: ProfileComponents = {
   security: false,
   users: false,
   database: false,
+  swarm: false,
   rebuild: false,
 };
 
@@ -81,6 +84,7 @@ export const FULL_STACK_COMPONENTS: ProfileComponents = {
   security: true,
   users: true,
   database: true,
+  swarm: true,
   rebuild: true,
 };
 
@@ -97,6 +101,7 @@ export const MINIMAL_COMPONENTS: ProfileComponents = {
   security: true,
   users: true,
   database: true,
+  swarm: false,
   rebuild: true,
 };
 
@@ -113,6 +118,7 @@ export const SECURITY_ONLY_COMPONENTS: ProfileComponents = {
   security: true,
   users: true,
   database: false,
+  swarm: false,
   rebuild: true,
 };
 
@@ -129,6 +135,7 @@ export const LOCAL_DOCKER_COMPONENTS: ProfileComponents = {
   security: false,
   users: false,
   database: false,
+  swarm: false,
   rebuild: false,
 };
 
@@ -145,6 +152,26 @@ export const VPS_DOCKER_COMPONENTS: ProfileComponents = {
   security: true,
   users: true,
   database: true,
+  swarm: false,
+  rebuild: true,
+};
+
+/**
+ * VPS full-Swarm profile: Caddy runs IN the swarm (Cloudflare edge), apps are
+ * swarm stacks on the shared overlay. No host-level Caddy/PHP/Node — apps carry
+ * their own runtime. System-wide PostgreSQL/Redis stay on the host.
+ */
+export const VPS_SWARM_COMPONENTS: ProfileComponents = {
+  docker: true,
+  php_fpm: false,
+  caddy: false,
+  nodejs: false,
+  nvm: false,
+  bun: false,
+  security: true,
+  users: true,
+  database: true,
+  swarm: true,
   rebuild: true,
 };
 
@@ -161,5 +188,6 @@ export const VPS_BARE_METAL_COMPONENTS: ProfileComponents = {
   security: true,
   users: true,
   database: true,
+  swarm: false,
   rebuild: true,
 };

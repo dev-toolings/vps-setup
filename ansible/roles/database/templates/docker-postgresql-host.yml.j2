@@ -1,7 +1,13 @@
 # {{ ansible_managed }}
-# Compose extension for Docker apps that use the system-wide PostgreSQL service.
+# Compose extension for apps that use the system-wide PostgreSQL service.
 #
-# Usage:
+# Swarm stacks (docker stack deploy): connect straight to the pinned
+# docker_gwbridge gateway — host.docker.internal is unreliable for swarm tasks.
+#   environment:
+#     DATABASE_HOST: "{{ swarm_gwbridge_gateway | default('172.18.0.1') }}"
+#     DATABASE_PORT: "{{ postgresql_port }}"
+#
+# Standalone docker compose (non-swarm): use the host-gateway anchor below.
 # services:
 #   app:
 #     <<: *postgres-host

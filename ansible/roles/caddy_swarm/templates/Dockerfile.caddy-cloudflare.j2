@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+# Caddy with the Cloudflare DNS module (DNS-01 / wildcard / non-exposed origins).
+FROM {{ caddy_swarm_builder_image }} AS builder
+RUN xcaddy build --with github.com/caddy-dns/cloudflare
+
+FROM {{ caddy_swarm_runtime_image }}
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy

@@ -10,6 +10,7 @@ import {
   LOCAL_DOCKER_COMPONENTS,
   VPS_DOCKER_COMPONENTS,
   VPS_BARE_METAL_COMPONENTS,
+  VPS_SWARM_COMPONENTS,
 } from "@/types/index.ts";
 import { parseYaml, toYaml, debug, error } from "@/utils/index.ts";
 import { parseServer, parseProfile, parseConfig } from "@/utils/index.ts";
@@ -126,6 +127,17 @@ export class PersistenceManager {
         overrides: {
           target_mode: "vps",
           stack_mode: "bare_metal",
+        },
+      },
+      {
+        name: "vps-swarm",
+        description: "Full Docker Swarm: Caddy Cloudflare edge in-swarm, apps as stacks, system-wide PostgreSQL/Redis",
+        components: VPS_SWARM_COMPONENTS,
+        runtimeUser: "root",
+        overrides: {
+          target_mode: "vps",
+          stack_mode: "swarm",
+          caddy_swarm_enabled: true,
         },
       },
     ];

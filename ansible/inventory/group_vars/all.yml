@@ -156,6 +156,16 @@ redis_enabled: true
 redis_package_state: latest
 redis_bind_addresses:
   - "127.0.0.1"
+# Expose the host Redis to swarm tasks (adds the gwbridge gateway to the bind +
+# opens UFW). Keep false unless requirepass is set; apps should prefer a per-stack
+# Redis sidecar. See /srv/apps/CLAUDE.md.
+redis_expose_to_swarm: false
+
+# -------------------------------------------
+# Docker Swarm networking (shared by swarm + database roles)
+# -------------------------------------------
+swarm_gwbridge_gateway: "172.18.0.1"
+swarm_gwbridge_subnet: "172.18.0.0/16"
 
 # -------------------------------------------
 # Rebuild Export Metadata
@@ -176,4 +186,5 @@ vps_components:
   security: true
   users: false
   database: false
+  swarm: false
   rebuild: false

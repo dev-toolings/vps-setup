@@ -1,0 +1,91 @@
+# CLAUDE.md — Déploiement d'apps (Docker Swarm + Caddy edge)
+
+> {{ ansible_managed }}
+> Fichier de convention généré par vps-setup. À lire AVANT de déployer toute app.
+> Architecture : **Caddy tourne DANS le Swarm** (edge Cloudflare) + apps en stacks.
+
+Ce VPS est un **nœud Swarm manager**. Le reverse proxy TLS est un **service Swarm**
+(`{{ caddy_swarm_stack_name }}_caddy`, image `{{ caddy_swarm_image }}`) branché sur le réseau overlay
+**`{{ caddy_swarm_network }}`**. Chaque app rejoint ce réseau et **ne publie AUCUN port** :
+Caddy la joint par **nom de service** (DNS Swarm). Seul Caddy publie `:80`/`:443`.
+PostgreSQL et Redis sont system-wide sur l'hôte.
+
+---
+
+## Règles obligatoires (une app = ces 3 étapes)
+
+### 1. Stack sur le réseau `{{ caddy_swarm_network }}` — aucun port publié
+```yaml
+# {{ app_base_dir | default('/srv/apps') }}/<app>/stack.yml
+services:
+  web:
+    image: <image>
+    networks: [{{ caddy_swarm_network }}, internal]   # edge = joignable par Caddy
+    # PAS de 'ports:' -> rien d'exposé publiquement
+    deploy:
+      replicas: 1
+      restart_policy: { condition: any }
+  worker:
+    image: <image>
+    networks: [internal]        # services internes: hors edge
+networks:
+  {{ caddy_swarm_network }}:
+    external: true              # réseau partagé créé par vps-setup
+  internal:
+    driver: overlay            # privé à la stack
+```
+Déploie : `docker stack deploy -c stack.yml <app>`.
+
+### 2. Reverse proxy — un fichier par projet, SANS restart
+Ajoute `{{ caddy_swarm_opt_dir }}/conf.d/<app>.caddy` puis recharge à chaud :
+```caddyfile
+# {{ caddy_swarm_opt_dir }}/conf.d/<app>.caddy
+app.mondomaine.com {
+    reverse_proxy <app>_web:<port_interne>    # nom du service Swarm, port INTERNE
+}
+```
+```bash
+caddy-reload      # docker exec ... caddy reload : recharge à chaud, AUCUN restart
+```
+TLS automatique (Let's Encrypt HTTP-01). Pour du wildcard / DNS-01 Cloudflare, dépose un
+token dans le conf.d : `tls { dns cloudflare {env.CF_API_TOKEN} }` (token via secret Swarm).
+
+### 3. Secrets — `docker secret`, jamais de `.env` sensible
+```bash
+printf '%s' "<valeur>" | docker secret create <app>_db_password -
+```
+```yaml
+services:
+  web:
+    secrets: [db_password]
+    environment: { DATABASE_PASSWORD_FILE: /run/secrets/db_password }
+secrets:
+  db_password: { external: true }
+```
+
+---
+
+## Données de l'hôte depuis une tâche Swarm
+Les tâches sortent via la gateway `docker_gwbridge` **`{{ swarm_gwbridge_gateway | default('172.18.0.1') }}`**.
+
+- **PostgreSQL** : `postgresql://<user>:<pass>@{{ swarm_gwbridge_gateway | default('172.18.0.1') }}:{{ postgresql_port | default(5432) }}/<db>`
+  (rôle + base dédiés par app ; jamais `postgres`).
+- **Redis** : par défaut, mets un **Redis sidecar** dans la stack (réseau `internal`). Le Redis
+  hôte n'est joignable que si `redis_expose_to_swarm` a été activé au provisioning.
+
+---
+
+## Checklist
+- [ ] `stack.yml` : service web sur `{{ caddy_swarm_network }}`, **aucun `ports:`**, secrets via `docker secret`
+- [ ] `{{ caddy_swarm_opt_dir }}/conf.d/<app>.caddy` → `reverse_proxy <app>_web:<port>` puis `caddy-reload`
+- [ ] `docker stack deploy -c stack.yml <app>` ; `curl -I https://app.mondomaine.com` → 200
+- [ ] Aucun port app public : `sudo ss -ltnp | grep -vE '127.0.0.1|::1'` → seuls 80/443 (Caddy)
+
+## Commandes
+```bash
+docker stack deploy -c {{ app_base_dir | default('/srv/apps') }}/<app>/stack.yml <app>
+docker stack services <app>
+docker service logs -f <app>_web
+caddy-reload                       # recharger Caddy après un conf.d (no restart)
+docker stack rm <app>
+```

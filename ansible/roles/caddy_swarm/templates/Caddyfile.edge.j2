@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# Caddy edge (in-swarm). One file per project in conf.d/ — added without restart.
+{
+    email {{ caddy_swarm_email }}
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
+    # Admin stays on the in-container default (localhost:2019), never published,
+    # so `docker exec <caddy> caddy reload` hot-reloads config with no restart.
+}
+
+# Per-project reverse-proxy sites (reverse_proxy <swarm_service>:<port>).
+import /etc/caddy/conf.d/*.caddy

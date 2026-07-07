@@ -3,6 +3,20 @@
 
 caddy_email: "admin@example.com"
 
+# Build Caddy with the Cloudflare DNS module (for DNS-01 challenges / wildcard /
+# non-exposed origins). Fetched pre-built from the official download API — no Go
+# or xcaddy needed on the host. Set false to keep the plain apt binary.
+caddy_cloudflare: true
+caddy_download_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+# Optional Cloudflare API token for DNS-01. Drop it (KEY=value, CF_API_TOKEN=...)
+# in this file to enable `tls { dns cloudflare {env.CF_API_TOKEN} }` in a site.
+caddy_cloudflare_env_file: "/etc/vps-setup/secrets/caddy-cloudflare.env"
+
+# Admin API on a unix socket: not exposed on the network (= "disabled" for
+# reachability) while `systemctl reload` still hot-reloads config WITHOUT a
+# restart. Off entirely would force a restart on every project add.
+caddy_admin_socket: "/run/caddy/admin.sock"
+
 # Directory of per-app reverse-proxy site files (<app>.caddy) imported by the
 # global Caddyfile. One Docker app == one file here. See /srv/apps/CLAUDE.md.
 caddy_sites_dir: "/etc/caddy/sites"

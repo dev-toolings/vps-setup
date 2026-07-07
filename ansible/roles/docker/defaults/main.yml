@@ -15,3 +15,18 @@ docker_log_driver: json-file
 docker_log_max_size: "10m"
 docker_log_max_file: "3"
 docker_storage_driver: overlay2
+# live-restore keeps standalone containers up across dockerd restarts, but Docker
+# refuses it in swarm mode. The template forces it off when the swarm component is on.
+docker_live_restore: true
+
+# Pin docker0 to a fixed subnet. Without bip, default-address-pools reassigns the
+# default bridge to the first pool, breaking the 172.17.0.1 assumption.
+docker_bip: "172.17.0.1/16"
+
+# Deterministic subnets for overlay/user networks created after this is applied.
+# Kept clear of docker0 (172.17/16) and the pinned docker_gwbridge (172.18/16).
+docker_default_address_pools:
+  - base: "172.20.0.0/14"
+    size: 24
+  - base: "172.24.0.0/14"
+    size: 24

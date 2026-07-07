@@ -18,6 +18,7 @@ describe("AnsibleRunner", () => {
         security: true,
         users: true,
         database: true,
+        swarm: false,
         rebuild: true,
       },
       runtimeUser: "deploy",

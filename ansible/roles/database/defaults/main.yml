@@ -18,4 +18,7 @@ redis_bind_addresses:
 # Set auto-generate to false AND leave the password empty to keep Redis open.
 redis_password: ""
 redis_password_auto_generate: true
+# Expose the host Redis to swarm tasks (gwbridge gateway bind + UFW). Requires a
+# password. Off by default; apps should prefer a per-stack Redis sidecar.
+redis_expose_to_swarm: false
 database_compose_snippet_dir: /srv/infrastructure/compose.d

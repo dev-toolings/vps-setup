@@ -30,6 +30,13 @@
       when: vps_components.docker | default(false)
       tags: [docker]
 
+- name: Docker Swarm (single-node manager)
+  hosts: all
+  roles:
+    - role: swarm
+      when: vps_components.swarm | default(false)
+      tags: [swarm]
+
 - name: System database services
   hosts: all
   roles:
@@ -50,6 +57,13 @@
     - role: caddy
       when: vps_components.caddy | default(false)
       tags: [caddy]
+
+- name: Caddy edge in Swarm (Cloudflare)
+  hosts: all
+  roles:
+    - role: caddy_swarm
+      when: caddy_swarm_enabled | default(false)
+      tags: [caddy_swarm, swarm]
 
 - name: Node.js runtime
   hosts: all

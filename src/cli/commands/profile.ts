@@ -27,6 +27,7 @@ export function createProfileCommands(pm: PersistenceManager): Command {
     .option("--security", "Enable security hardening")
     .option("--users", "Enable Linux users and permissions")
     .option("--database", "Enable system-wide PostgreSQL/Redis")
+    .option("--swarm", "Enable Docker Swarm (single-node manager)")
     .option("--rebuild", "Enable rebuild/export metadata")
     .option("--runtime-user <user>", "Runtime user for services")
     .action(async (name, options) => {
@@ -43,7 +44,7 @@ export function createProfileCommands(pm: PersistenceManager): Command {
       // Check if any component flags were provided
       const hasFlags = options.docker || options.phpFpm || options.caddy ||
         options.nodejs || options.nvm || options.bun || options.security ||
-        options.users || options.database || options.rebuild;
+        options.users || options.database || options.swarm || options.rebuild;
 
       if (hasFlags && options.runtimeUser) {
         // Non-interactive mode
@@ -60,6 +61,7 @@ export function createProfileCommands(pm: PersistenceManager): Command {
             security: options.security || false,
             users: options.users || false,
             database: options.database || false,
+            swarm: options.swarm || false,
             rebuild: options.rebuild || false,
           },
           runtimeUser: options.runtimeUser,
@@ -86,6 +88,7 @@ export function createProfileCommands(pm: PersistenceManager): Command {
                   { value: "security", label: "Security Hardening", hint: "UFW, Fail2ban, SSH" },
                   { value: "users", label: "Users + Permissions", hint: "deploy user and app users" },
                   { value: "database", label: "PostgreSQL + Redis", hint: "System-wide database services" },
+                  { value: "swarm", label: "Docker Swarm", hint: "Single-node manager + deterministic networking" },
                   { value: "rebuild", label: "Rebuild Metadata", hint: "Exportable restore configuration" },
                 ],
                 initialValues: [] as string[],
@@ -121,6 +124,7 @@ export function createProfileCommands(pm: PersistenceManager): Command {
           security: selectedComponents.includes("security"),
           users: selectedComponents.includes("users"),
           database: selectedComponents.includes("database"),
+          swarm: selectedComponents.includes("swarm"),
           rebuild: selectedComponents.includes("rebuild"),
         };
 
@@ -222,6 +226,7 @@ export function createProfileCommands(pm: PersistenceManager): Command {
         security: "Security Hardening",
         users: "Users + Permissions",
         database: "PostgreSQL + Redis",
+        swarm: "Docker Swarm",
         rebuild: "Rebuild Metadata",
       };
 
@@ -278,6 +283,7 @@ export function createProfileCommands(pm: PersistenceManager): Command {
                 { value: "security", label: "Security Hardening" },
                 { value: "users", label: "Users + Permissions" },
                 { value: "database", label: "PostgreSQL + Redis" },
+                { value: "swarm", label: "Docker Swarm" },
                 { value: "rebuild", label: "Rebuild Metadata" },
               ],
               initialValues: Object.entries(prof.components)
@@ -314,6 +320,7 @@ export function createProfileCommands(pm: PersistenceManager): Command {
         security: selectedComponents.includes("security"),
         users: selectedComponents.includes("users"),
         database: selectedComponents.includes("database"),
+        swarm: selectedComponents.includes("swarm"),
         rebuild: selectedComponents.includes("rebuild"),
       };
 
