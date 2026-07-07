@@ -1,6 +1,17 @@
 ---
 # Bun role - Main tasks (per-user installation)
 
+- name: Resolve runtime user home directory
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ runtime_user }}"
+
+- name: Set Bun install path to an absolute home path
+  # "~user" is not expanded inside double-quoted shell strings nor in
+  # profile.d/.bashrc, so use the resolved absolute home directory instead.
+  ansible.builtin.set_fact:
+    bun_install_path: "{{ getent_passwd[runtime_user][4] }}/.bun"
+
 - name: Check if Bun is already installed
   ansible.builtin.stat:
     path: "{{ bun_install_path }}/bin/bun"

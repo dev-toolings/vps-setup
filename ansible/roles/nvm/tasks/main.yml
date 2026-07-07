@@ -1,6 +1,17 @@
 ---
 # NVM role - Main tasks (per-user installation)
 
+- name: Resolve runtime user home directory
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ runtime_user }}"
+
+- name: Set NVM install path to an absolute home path
+  # "~user" is not expanded inside double-quoted shell strings, env vars, nor
+  # profile.d, producing a literal "~user" directory. Use the resolved home.
+  ansible.builtin.set_fact:
+    nvm_install_path: "{{ getent_passwd[runtime_user][4] }}/.nvm"
+
 - name: Check if NVM is already installed
   ansible.builtin.stat:
     path: "{{ nvm_install_path }}/nvm.sh"

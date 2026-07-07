@@ -10,7 +10,10 @@ vps_components:
   nvm: false
   bun: true
   security: true
-  users: false
+  # Keep users enabled whenever security is: SSH hardening disables root login,
+  # and the deploy-user + authorized_keys copy (users role) is what prevents a
+  # lockout. Never ship security:true with users:false.
+  users: true
   database: false
   rebuild: false
 

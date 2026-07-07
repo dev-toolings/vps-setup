@@ -82,8 +82,18 @@
     owner: root
     group: root
     mode: '0644'
-    validate: caddy validate --config %s
+    validate: caddy validate --adapter caddyfile --config %s
   notify: Reload Caddy
+
+- name: Ensure Caddy owns its log directory
+  # `caddy validate` runs as root and provisions the file logger, creating
+  # root-owned log files the caddy service user cannot write. Reclaim them.
+  ansible.builtin.file:
+    path: /var/log/caddy
+    state: directory
+    owner: caddy
+    group: caddy
+    recurse: true
 
 - name: Ensure Caddy service is enabled and started
   ansible.builtin.systemd:

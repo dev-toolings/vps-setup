@@ -2,7 +2,7 @@
 # Caddy role handlers
 
 - name: Validate and reload Caddy
-  ansible.builtin.command: caddy validate --config /etc/caddy/Caddyfile
+  ansible.builtin.command: caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile
   changed_when: false
   notify: Reload Caddy
   when: caddy_runtime_available | default(true)
