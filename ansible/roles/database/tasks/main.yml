@@ -264,6 +264,71 @@
     - ansible_check_mode
     - not (redis_runtime_available | default(false))
 
+- name: Ensure vps-setup secrets directory exists (redis)
+  ansible.builtin.file:
+    path: /etc/vps-setup/secrets
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when:
+    - redis_enabled | bool
+    - redis_runtime_available | default(false)
+
+- name: Generate Redis password if none provided
+  ansible.builtin.shell: |
+    set -euo pipefail
+    file="/etc/vps-setup/secrets/redis.pass"
+    if [ ! -f "$file" ]; then
+      umask 077
+      openssl rand -hex 32 > "$file"
+    fi
+  args:
+    executable: /bin/bash
+    creates: /etc/vps-setup/secrets/redis.pass
+  when:
+    - redis_enabled | bool
+    - redis_runtime_available | default(false)
+    - redis_password | length == 0
+    - redis_password_auto_generate | bool
+    - not ansible_check_mode
+
+- name: Read generated Redis password
+  ansible.builtin.slurp:
+    src: /etc/vps-setup/secrets/redis.pass
+  register: redis_password_file
+  no_log: true
+  when:
+    - redis_enabled | bool
+    - redis_runtime_available | default(false)
+    - redis_password | length == 0
+    - redis_password_auto_generate | bool
+    - not ansible_check_mode
+
+- name: Resolve effective Redis password
+  ansible.builtin.set_fact:
+    redis_effective_password: >-
+      {{ redis_password if (redis_password | length > 0)
+         else (redis_password_file.content | b64decode | trim
+               if (redis_password_file.content is defined) else '') }}
+  no_log: true
+  when:
+    - redis_enabled | bool
+    - redis_runtime_available | default(false)
+
+- name: Configure Redis requirepass
+  ansible.builtin.lineinfile:
+    path: /etc/redis/redis.conf
+    regexp: '^#?\s*requirepass\s'
+    line: "requirepass {{ redis_effective_password }}"
+  no_log: true
+  notify: Restart Redis
+  when:
+    - redis_enabled | bool
+    - redis_runtime_available | default(false)
+    - redis_effective_password | default('') | length > 0
+    - not ansible_check_mode
+
 - name: Configure Redis bind addresses
   ansible.builtin.lineinfile:
     path: /etc/redis/redis.conf

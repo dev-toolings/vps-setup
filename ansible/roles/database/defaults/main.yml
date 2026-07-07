@@ -12,4 +12,10 @@ redis_enabled: true
 redis_package_state: latest
 redis_bind_addresses:
   - "127.0.0.1"
+# Redis authentication (requirepass). Leave redis_password empty and keep
+# auto-generate on to have a strong password created once and stored in
+# /etc/vps-setup/secrets/redis.pass. Set redis_password (via vault) to pin one.
+# Set auto-generate to false AND leave the password empty to keep Redis open.
+redis_password: ""
+redis_password_auto_generate: true
 database_compose_snippet_dir: /srv/infrastructure/compose.d

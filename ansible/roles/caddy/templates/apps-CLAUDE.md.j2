@@ -78,22 +78,38 @@ sudo -u postgres createuser --pwprompt <app_user>
 sudo -u postgres createdb --owner=<app_user> <app_db>
 ```
 
-### Redis — NON joignable depuis un conteneur (par défaut)
-Le Redis de l'hôte bind **`127.0.0.1` uniquement** et n'a pas d'auth : il n'est
-**pas** accessible depuis les conteneurs, et on ne l'expose pas tel quel.
+### Redis — protégé par mot de passe, loopback par défaut
+Le Redis de l'hôte a un **`requirepass`** (mot de passe) et bind **`127.0.0.1`
+uniquement**. Le mot de passe est stocké sur l'hôte (root only) :
 
-Pour du cache applicatif : **embarque un Redis dans le compose de l'app** (isolé, jetable) :
-
-```yaml
-services:
-  redis:
-    image: redis:8-alpine
-    restart: unless-stopped
-    # pas de ports: -> accessible seulement par 'app' sur le réseau du compose
+```bash
+sudo cat /etc/vps-setup/secrets/redis.pass
 ```
 
-(Exposer le Redis hôte à Docker exigerait `bind 172.17.0.1` **+** `requirepass` ; à ne
-faire que délibérément.)
+**Deux usages possibles :**
+
+1. **Cache isolé par app (recommandé)** — embarque un Redis dans le compose de l'app
+   (jetable, aucune coordination de secret) :
+   ```yaml
+   services:
+     redis:
+       image: redis:8-alpine
+       restart: unless-stopped
+       # pas de ports: -> joignable seulement par 'app' sur le réseau du compose
+   ```
+
+2. **Redis hôte partagé depuis Docker** — ajoute la gateway au bind puis pointe l'app
+   dessus avec le mot de passe :
+   ```bash
+   # sur l'hôte : autoriser l'accès depuis le bridge Docker
+   sudo sed -i 's/^bind .*/bind 127.0.0.1 172.17.0.1/' /etc/redis/redis.conf
+   sudo systemctl restart redis-server
+   ```
+   ```env
+   # .env de l'app
+   REDIS_URL=redis://:<mot_de_passe>@172.17.0.1:6379/0
+   ```
+   (Ne jamais exposer Redis sans `requirepass` ni au-delà de la loopback/gateway.)
 
 ---
 
