@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">VPS Setup</title>
+  <desc id="desc">Modern CLI for VPS provisioning with Ansible.</desc>
+  <rect width="1200" height="630" fill="#0f172a"/>
+  <rect x="72" y="72" width="1056" height="486" rx="28" fill="#111827" stroke="#334155"/>
+  <text x="112" y="170" fill="#93c5fd" font-family="Inter, Arial, sans-serif" font-size="32" font-weight="700">VPS Setup</text>
+  <text x="112" y="292" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="800">Provision VPS</text>
+  <text x="112" y="382" fill="#cbd5e1" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="800">with Ansible.</text>
+  <text x="112" y="470" fill="#e2e8f0" font-family="Inter, Arial, sans-serif" font-size="30">Servers, profiles, configuration and provisioning history.</text>
+  <text x="112" y="520" fill="#bfdbfe" font-family="Inter, Arial, sans-serif" font-size="24">CLI-first · reusable profiles · dry-run friendly</text>
+</svg>

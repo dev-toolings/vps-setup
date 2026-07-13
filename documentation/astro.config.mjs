@@ -3,7 +3,10 @@ import react from "@astrojs/react";
 import mdx from "@astrojs/mdx";
 import tailwind from "@astrojs/tailwind";
 
+const SITE = process.env.SITE_URL || "https://vps-setup.dev";
+
 export default defineConfig({
+  site: SITE,
   integrations: [
     react(),
     mdx(),

@@ -1,5 +1,6 @@
 {
   "name": "vps-setup-docs",
+  "description": "Documentation site for VPS Setup, a CLI for VPS provisioning with Ansible.",
   "type": "module",
   "version": "0.0.1",
   "scripts": {

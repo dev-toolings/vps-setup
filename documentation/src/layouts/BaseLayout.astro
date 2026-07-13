@@ -1,20 +1,66 @@
 ---
+import { getLocaleFromUrl, getLocalizedUrl } from "@/i18n/utils";
+
 interface Props {
   title: string;
   description?: string;
+  noindex?: boolean;
 }
 
-const { title, description = "Modern CLI for VPS provisioning with Ansible" } = Astro.props;
+const lang = getLocaleFromUrl(Astro.url);
+const defaultDescription = lang === "fr"
+  ? "CLI moderne pour provisionner et gérer des serveurs VPS avec Ansible."
+  : "Modern CLI for provisioning and managing VPS servers with Ansible.";
+const {
+  title,
+  description = defaultDescription,
+  noindex = false,
+} = Astro.props;
+const site = Astro.site ?? new URL("https://vps-setup.dev");
+const fullTitle = `${title} | VPS Setup`;
+const canonical = new URL(Astro.url.pathname, site).toString();
+const altEn = new URL(lang === "en" ? Astro.url.pathname : getLocalizedUrl(Astro.url, "en"), site).toString();
+const altFr = new URL(lang === "fr" ? Astro.url.pathname : getLocalizedUrl(Astro.url, "fr"), site).toString();
+const socialImage = new URL("/social-card.svg", site).toString();
+const structuredData = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "VPS Setup",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Linux, macOS",
+  url: new URL(`/${lang}/`, site).toString(),
+  description,
+}).replaceAll("<", "\\u003c");
 ---
 
 <!doctype html>
-<html lang={Astro.currentLocale ?? "en"}>
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
+    <meta name="robots" content={noindex ? "noindex, nofollow" : "index, follow"} />
+    <meta name="application-name" content="VPS Setup" />
+    <meta name="author" content="VPS Setup" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>{title} | VPS Setup</title>
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="en" href={altEn} />
+    <link rel="alternate" hreflang="fr" href={altFr} />
+    <link rel="alternate" hreflang="x-default" href={altEn} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VPS Setup" />
+    <meta property="og:locale" content={lang === "fr" ? "fr_FR" : "en_US"} />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:image:alt" content={fullTitle} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
+    {!noindex && <script type="application/ld+json" set:html={structuredData} />}
+    <title>{fullTitle}</title>
     <script is:inline>
       const theme = localStorage.getItem("theme") ??
         (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
