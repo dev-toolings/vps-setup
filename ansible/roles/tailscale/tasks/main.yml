@@ -1,0 +1,171 @@
+---
+# Tailscale role - install the client, join the tailnet, and PROVE
+# connectivity before returning. The security role's UFW task relies on the
+# `tailscale_ipv4` fact set here to decide it is safe to drop the public SSH
+# rule: this role must never report success without that proof.
+
+- name: Ensure prerequisite packages are present
+  ansible.builtin.apt:
+    name:
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Add Tailscale package signing key
+  ansible.builtin.get_url:
+    url: "https://pkgs.tailscale.com/stable/{{ ansible_facts.distribution | lower }}/{{ ansible_facts.distribution_release }}.noarmor.gpg"
+    dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    mode: '0644'
+
+- name: Add Tailscale apt repository
+  ansible.builtin.get_url:
+    url: "https://pkgs.tailscale.com/stable/{{ ansible_facts.distribution | lower }}/{{ ansible_facts.distribution_release }}.tailscale-keyring.list"
+    dest: /etc/apt/sources.list.d/tailscale.list
+    mode: '0644'
+  register: tailscale_repo_added
+
+- name: Update apt cache after adding the Tailscale repository
+  ansible.builtin.apt:
+    update_cache: true
+  when: tailscale_repo_added.changed
+
+- name: Install Tailscale
+  ansible.builtin.apt:
+    name: tailscale
+    state: present
+
+- name: Ensure the tailscaled service is enabled and running
+  ansible.builtin.systemd:
+    name: tailscaled
+    state: started
+    enabled: true
+
+- name: Read current Tailscale status
+  ansible.builtin.command: tailscale status --json
+  register: tailscale_status_raw
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Parse current Tailscale status
+  ansible.builtin.set_fact:
+    tailscale_status_parsed: >-
+      {{ (tailscale_status_raw.stdout | from_json)
+         if (tailscale_status_raw.rc == 0 and (tailscale_status_raw.stdout | trim | length > 0))
+         else {} }}
+
+- name: Determine whether this node is already connected
+  ansible.builtin.set_fact:
+    tailscale_already_connected: "{{ (tailscale_status_parsed.BackendState | default('')) == 'Running' }}"
+
+- name: Fail if the node is not connected and no auth key was supplied
+  ansible.builtin.fail:
+    msg: >-
+      Tailscale is not connected on this host (BackendState != 'Running') and
+      tailscale_auth_key is empty. Pass -e tailscale_auth_key=<key> (an
+      ephemeral or reusable pre-auth key from the Tailscale admin console) or
+      join the tailnet manually before re-running this playbook.
+  when:
+    - not (tailscale_already_connected | bool)
+    - (tailscale_auth_key | default('')) | length == 0
+
+- name: Join the tailnet
+  ansible.builtin.command:
+    cmd: >-
+      tailscale up
+      --auth-key={{ tailscale_auth_key }}
+      --hostname={{ tailscale_hostname }}
+      --accept-dns={{ tailscale_accept_dns | bool | ternary('true', 'false') }}
+      --ssh={{ tailscale_ssh_enabled | bool | ternary('true', 'false') }}
+  when:
+    - not (tailscale_already_connected | bool)
+    - (tailscale_auth_key | default('')) | length > 0
+  no_log: true
+  changed_when: true
+
+# In check mode, "Join the tailnet" above is skipped (command modules don't
+# run under --check unless forced). If the node was not already connected,
+# there is therefore nothing real to wait for: forcing the wait/proof tasks
+# to run for real anyway (as they did before this fix) burns retries*delay
+# against an unauthenticated local daemon and then fails the whole --check
+# run. Skip them and say so, the same way roles/security/tasks/ufw.yml
+# explains its own skipped runtime tasks in check mode. If the node WAS
+# already connected, there is nothing to skip: the wait/proof below resolves
+# immediately against the real, already-Running backend and stays accurate.
+- name: Determine whether the connectivity proof can run in this mode
+  ansible.builtin.set_fact:
+    tailscale_check_mode_skip_proof: "{{ ansible_check_mode and not (tailscale_already_connected | bool) }}"
+
+- name: Explain skipped Tailscale connectivity proof in check mode
+  ansible.builtin.debug:
+    msg: >-
+      Tailscale packages would be installed and 'tailscale up' would run;
+      the connectivity wait/proof is skipped because this is check mode and
+      the node is not already connected (nothing was actually joined to wait
+      for).
+  when: tailscale_check_mode_skip_proof
+
+- name: Wait for the Tailscale backend to report Running
+  ansible.builtin.command: tailscale status --json
+  register: tailscale_status_wait
+  changed_when: false
+  # The backend can legitimately exit non-zero or print nothing while it is
+  # not yet ready - that is exactly the state this task is waiting out. Do
+  # not let a single non-zero exit abort the retry loop before it starts.
+  failed_when: false
+  check_mode: false
+  # `and` short-circuits in a native Jinja condition: from_json is only ever
+  # evaluated once stdout is confirmed non-empty. Without the length check
+  # first, an empty stdout makes from_json raise a template error - not a
+  # "false" condition - which kills the retry loop instead of retrying it.
+  until: >-
+    (tailscale_status_wait.stdout | default('') | trim | length > 0)
+    and ((tailscale_status_wait.stdout | from_json).BackendState | default('')) == 'Running'
+  retries: "{{ tailscale_wait_retries }}"
+  delay: "{{ tailscale_wait_delay }}"
+  when: not tailscale_check_mode_skip_proof
+
+- name: Parse confirmed Tailscale status
+  ansible.builtin.set_fact:
+    tailscale_status_confirmed: >-
+      {{ (tailscale_status_wait.stdout | from_json)
+         if (tailscale_status_wait.stdout | default('') | trim | length > 0)
+         else {} }}
+  when: not tailscale_check_mode_skip_proof
+
+- name: Extract this node's tailnet IPv4 address
+  ansible.builtin.set_fact:
+    tailscale_ipv4: >-
+      {{ (tailscale_status_confirmed.Self.TailscaleIPs | default([])
+          | select('match', '^[0-9]+\.') | list | first) | default('') }}
+  when: not tailscale_check_mode_skip_proof
+
+# The property this role must prove is "the backend is Running", not merely
+# "an address is present": Self.TailscaleIPs is not gated on BackendState, so
+# a stale/stopped node (previously joined, then `tailscale down`, or an
+# expired key) can still carry tailnet addresses. Fail on either signal being
+# wrong, not just on the address being empty - a corollary is not the
+# property.
+- name: Fail loudly if connectivity cannot be proven
+  ansible.builtin.fail:
+    msg: >-
+      Tailscale reports BackendState={{ tailscale_status_confirmed.BackendState | default('unknown') }}
+      (expected 'Running') and tailnet IPv4='{{ tailscale_ipv4 | default('') }}'.
+      Refusing to continue: the security role must not be allowed to close the
+      public SSH port without proof this node is both Running and reachable
+      over Tailscale.
+  when: >-
+    not tailscale_check_mode_skip_proof
+    and (
+      (tailscale_ipv4 | default('')) | length == 0
+      or (tailscale_status_confirmed.BackendState | default('')) != 'Running'
+    )
+
+- name: Report confirmed Tailscale connectivity
+  ansible.builtin.debug:
+    msg: >-
+      Tailscale connected: BackendState={{ tailscale_status_confirmed.BackendState | default('unknown') }},
+      tailnet IPv4={{ tailscale_ipv4 }}
+  when: not tailscale_check_mode_skip_proof

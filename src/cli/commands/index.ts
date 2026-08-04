@@ -5,3 +5,4 @@ export { createHistoryCommand } from "./history.ts";
 export { createConfigCommand, createInitCommand } from "./config.ts";
 export { createUninstallCommand } from "./uninstall.ts";
 export { createRebuildCommand } from "./rebuild.ts";
+export { createAuditCommand } from "./audit.ts";

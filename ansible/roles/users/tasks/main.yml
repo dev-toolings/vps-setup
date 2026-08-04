@@ -23,13 +23,39 @@
   when: deploy_user_copy_authorized_keys | bool
 
 - name: Refuse SSH hardening without deploy user keys
+  # A source that EXISTS but is empty (truncated file, comments-only file, an
+  # authorized_keys the provider's image created but never populated) is not
+  # a key. Test .stat.size, not just .stat.exists: existence is the source's
+  # antecedent, a usable key is the property this guard actually needs.
   ansible.builtin.fail:
     msg: >-
-      Root SSH login is disabled, but no authorized_keys source or explicit
-      deploy_user_authorized_keys were found for {{ deploy_user }}.
+      Root SSH login is disabled, but no non-empty authorized_keys source or
+      explicit deploy_user_authorized_keys were found for {{ deploy_user }}.
   when:
     - ssh_permit_root_login | default('no') == 'no'
-    - not ((deploy_user_copy_authorized_keys | bool and deploy_authorized_keys_source.stat.exists | default(false)) or deploy_user_authorized_keys | length > 0)
+    - >-
+      not (
+        (deploy_user_copy_authorized_keys | bool
+         and deploy_authorized_keys_source.stat.exists | default(false)
+         and (deploy_authorized_keys_source.stat.size | default(0)) > 0)
+        or deploy_user_authorized_keys | length > 0
+      )
+
+- name: Record that this run makes an SSH key available for deploy_user
+  # Fact, not prediction: this task only runs when the users role itself was
+  # actually included by the play (not filtered out by --tags), so a --tags
+  # selection that drops the 'users' role never sets it. Read by the security
+  # role's lockout guard (roles/security/tasks/preflight.yml), which cannot
+  # otherwise tell "will run" from "was configured to run". Same size check
+  # as the fail task above: a fact derived from a path's existence, rather
+  # than its content, would just be a prediction wearing a fact's name.
+  ansible.builtin.set_fact:
+    users_role_confirms_deploy_key: true
+  when: >-
+    (deploy_user_copy_authorized_keys | bool
+     and deploy_authorized_keys_source.stat.exists | default(false)
+     and (deploy_authorized_keys_source.stat.size | default(0)) > 0)
+    or deploy_user_authorized_keys | length > 0
 
 - name: Ensure deploy SSH directory exists
   ansible.builtin.file:

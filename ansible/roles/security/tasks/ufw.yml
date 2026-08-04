@@ -1,6 +1,36 @@
 ---
 # UFW Firewall Configuration
 
+# The "ssh_allow_users must include deploy_user" lockout guard (invariant 3)
+# used to live here. Moved to roles/security/tasks/preflight.yml (tag
+# always): `--tags ssh` includes ssh.yml, which writes AllowUsers into
+# sshd_config, without including this file, so the guard was decorative on
+# that path. preflight.yml is included unconditionally whenever the security
+# role runs at all, tag filtering or not.
+
+# "Zero public port" (invariant, vps-private posture) is currently only
+# carried by a CLI profile override (src/core/persistence.ts sets
+# ufw_allowed_ports: [] for the vps-private profile). A direct Ansible
+# invocation that sets ufw_ssh_interface without also clearing
+# ufw_allowed_ports keeps 80/443 open to the world: ufw_ssh_interface only
+# MOVES SSH off the public interface, it does not close the other ports. Fail
+# before any UFW rule is touched unless the operator explicitly acknowledges
+# the public ports are intentional.
+- name: Fail if Tailscale-only SSH is requested while other ports stay public
+  ansible.builtin.fail:
+    msg: >-
+      ufw_ssh_interface is set to '{{ ufw_ssh_interface }}' (SSH moved off the
+      public interface) but ufw_allowed_ports still opens
+      {{ ufw_allowed_ports | default([]) | difference([ssh_port | default(22)]) }}
+      to the public internet. ufw_ssh_interface only relocates SSH, it does not
+      close the other ports. Either trim ufw_allowed_ports down to what should
+      really stay public, or set ufw_ssh_interface_confirm_public_ports: true
+      to acknowledge this is intentional.
+  when:
+    - (ufw_ssh_interface | default('')) | length > 0
+    - (ufw_allowed_ports | default([]) | difference([ssh_port | default(22)])) | length > 0
+    - not (ufw_ssh_interface_confirm_public_ports | default(false) | bool)
+
 - name: Install UFW
   ansible.builtin.apt:
     name: ufw
@@ -56,13 +86,90 @@
     logging: "{{ ufw_logging }}"
   when: ufw_runtime_available
 
-- name: Allow SSH port
+- name: Allow SSH port (public, all interfaces)
   community.general.ufw:
     rule: allow
     port: "{{ ssh_port }}"
     proto: tcp
     comment: SSH
-  when: ufw_runtime_available
+  when:
+    - ufw_runtime_available
+    - (ufw_ssh_interface | default('')) | length == 0
+
+# --- Tailscale-only SSH (invariant 2) -------------------------------------
+# ufw_ssh_interface is only meaningful once Tailscale connectivity has been
+# PROVEN (the tailscale role sets the tailscale_ipv4 fact only after it
+# confirms BackendState == Running and reads a tailnet IPv4 address). If
+# ufw_ssh_interface is requested but that proof is missing, fail loudly
+# instead of silently keeping (or silently dropping) the public rule: either
+# outcome would look like success while leaving the host in an unintended
+# state.
+#
+# Exception: --check on a node that is not already connected. The tailscale
+# role itself skips the proof there (nothing was actually joined to wait
+# for, roles/tailscale/tasks/main.yml sets tailscale_check_mode_skip_proof
+# and explains it) and correctly leaves tailscale_ipv4 empty. On an
+# ALREADY-PROVISIONED host, ufw_runtime_available is true even under --check
+# (its own detection task runs for real), so without this exception the
+# guard below fired on a dry run against a perfectly healthy vps-private
+# host, breaking the repo's main human safety net on its most dangerous
+# profile. Reuse the same fact rather than testing ansible_check_mode alone:
+# ansible_check_mode alone would also skip this guard when the node WAS
+# already connected and tailscale_ipv4 IS available, which would make the
+# guard inert on a dry run against a node with genuinely broken
+# connectivity - exactly the run where it should still warn. In real
+# execution (not --check) this exception never applies: the guard stays
+# exactly as strict as before.
+- name: Explain skipped Tailscale connectivity guard in check mode
+  ansible.builtin.debug:
+    msg: >-
+      ufw_ssh_interface is set to '{{ ufw_ssh_interface }}' but this node was
+      not already connected to Tailscale, so the tailscale role skipped its
+      connectivity proof for this check-mode run (nothing to prove yet). The
+      guard that would normally fail here is skipped for the same reason;
+      it will run for real and can still fail on the next real execution.
+  when:
+    - ufw_runtime_available
+    - (ufw_ssh_interface | default('')) | length > 0
+    - (tailscale_ipv4 | default('')) | length == 0
+    - ansible_check_mode
+    - tailscale_check_mode_skip_proof | default(false) | bool
+
+- name: Fail if SSH-over-Tailscale is requested without proven connectivity
+  ansible.builtin.fail:
+    msg: >-
+      ufw_ssh_interface is set to '{{ ufw_ssh_interface }}' but no Tailscale
+      connectivity was proven for this host (the tailscale_ipv4 fact is
+      missing or empty). Run the tailscale role before security, or unset
+      ufw_ssh_interface.
+  when:
+    - ufw_runtime_available
+    - (ufw_ssh_interface | default('')) | length > 0
+    - (tailscale_ipv4 | default('')) | length == 0
+    - not (ansible_check_mode and (tailscale_check_mode_skip_proof | default(false) | bool))
+
+- name: Allow SSH on the Tailscale interface only
+  community.general.ufw:
+    rule: allow
+    interface_in: "{{ ufw_ssh_interface }}"
+    port: "{{ ssh_port }}"
+    proto: tcp
+    comment: "SSH via Tailscale"
+  when:
+    - ufw_runtime_available
+    - (ufw_ssh_interface | default('')) | length > 0
+    - (tailscale_ipv4 | default('')) | length > 0
+
+- name: Remove the public SSH allow rule now that SSH is Tailscale-only
+  community.general.ufw:
+    rule: allow
+    port: "{{ ssh_port }}"
+    proto: tcp
+    delete: true
+  when:
+    - ufw_runtime_available
+    - (ufw_ssh_interface | default('')) | length > 0
+    - (tailscale_ipv4 | default('')) | length > 0
 
 - name: Allow configured ports
   community.general.ufw:

@@ -24,6 +24,10 @@ export interface ProfileComponents {
   swarm: boolean;
   /** Enable rebuild/export metadata */
   rebuild: boolean;
+  /** Join a Tailscale tailnet and prove connectivity before security closes public SSH */
+  tailscale: boolean;
+  /** Apply AppArmor + unattended security upgrades */
+  hardening: boolean;
 }
 
 /**
@@ -69,6 +73,8 @@ export const DEFAULT_COMPONENTS: ProfileComponents = {
   database: false,
   swarm: false,
   rebuild: false,
+  tailscale: false,
+  hardening: false,
 };
 
 /**
@@ -86,6 +92,8 @@ export const FULL_STACK_COMPONENTS: ProfileComponents = {
   database: true,
   swarm: true,
   rebuild: true,
+  tailscale: false,
+  hardening: false,
 };
 
 /**
@@ -103,6 +111,8 @@ export const MINIMAL_COMPONENTS: ProfileComponents = {
   database: true,
   swarm: false,
   rebuild: true,
+  tailscale: false,
+  hardening: false,
 };
 
 /**
@@ -120,6 +130,8 @@ export const SECURITY_ONLY_COMPONENTS: ProfileComponents = {
   database: false,
   swarm: false,
   rebuild: true,
+  tailscale: false,
+  hardening: false,
 };
 
 /**
@@ -137,6 +149,8 @@ export const LOCAL_DOCKER_COMPONENTS: ProfileComponents = {
   database: false,
   swarm: false,
   rebuild: false,
+  tailscale: false,
+  hardening: false,
 };
 
 /**
@@ -154,6 +168,8 @@ export const VPS_DOCKER_COMPONENTS: ProfileComponents = {
   database: true,
   swarm: false,
   rebuild: true,
+  tailscale: false,
+  hardening: false,
 };
 
 /**
@@ -173,6 +189,8 @@ export const VPS_SWARM_COMPONENTS: ProfileComponents = {
   database: true,
   swarm: true,
   rebuild: true,
+  tailscale: false,
+  hardening: false,
 };
 
 /**
@@ -190,4 +208,28 @@ export const VPS_BARE_METAL_COMPONENTS: ProfileComponents = {
   database: true,
   swarm: false,
   rebuild: true,
+  tailscale: false,
+  hardening: false,
+};
+
+/**
+ * VPS private profile components: no public TCP port at all, administration
+ * only over Tailscale. security + tailscale + hardening are enabled; the
+ * profile's overrides (see persistence.ts) set ssh_allow_users and
+ * ufw_ssh_interface so the security role scopes SSH to the tailnet.
+ */
+export const VPS_PRIVATE_COMPONENTS: ProfileComponents = {
+  docker: false,
+  php_fpm: false,
+  caddy: false,
+  nodejs: false,
+  nvm: false,
+  bun: false,
+  security: true,
+  users: true,
+  database: false,
+  swarm: false,
+  rebuild: true,
+  tailscale: true,
+  hardening: true,
 };

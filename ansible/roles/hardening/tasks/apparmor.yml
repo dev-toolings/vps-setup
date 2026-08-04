@@ -1,0 +1,77 @@
+---
+# AppArmor - install, enable, verify. No custom application profiles here:
+# that is out of scope for this role.
+
+- name: Install AppArmor packages
+  ansible.builtin.apt:
+    name:
+      - apparmor
+      - apparmor-utils
+    state: present
+
+- name: Check whether aa-status is available
+  ansible.builtin.shell: command -v aa-status
+  args:
+    executable: /bin/bash
+  register: apparmor_command
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Set AppArmor runtime availability
+  ansible.builtin.set_fact:
+    apparmor_runtime_available: "{{ apparmor_command.rc == 0 }}"
+
+# Same motif as roles/security/tasks/ufw.yml's "Explain skipped UFW runtime
+# tasks in check mode": under --check, the apt install above is simulated,
+# so aa-status is genuinely absent on a fresh host. Without this guard, the
+# verification commands below still ran for real (check_mode: false) against
+# a binary that was never installed - rc 127, turned into a hard failure by
+# `failed_when: apparmor_status.rc not in [0, 1]`. A --check run must not
+# fail on a symptom of its own dry-run nature.
+- name: Explain skipped AppArmor verification in check mode
+  ansible.builtin.debug:
+    msg: "AppArmor packages would be installed; aa-status verification is skipped because this is check mode."
+  when:
+    - ansible_check_mode
+    - not apparmor_runtime_available
+
+# Unlike check mode, this is NOT a legitimate skip condition: "Install
+# AppArmor packages" just ran for real (not simulated), so if aa-status is
+# still missing afterwards, that is an anomaly, not an expected absence. A
+# role that certifies hardening must not report success without having
+# verified anything - fail loudly instead of silently skipping the three
+# tasks below.
+- name: Fail if AppArmor was installed but aa-status is still unavailable
+  ansible.builtin.fail:
+    msg: >-
+      apt reported apparmor/apparmor-utils installed, but 'aa-status' is not
+      on PATH. This is not a legitimate skip condition (unlike check mode,
+      where the install itself was only simulated): refusing to report
+      success without having verified AppArmor is actually enabled.
+  when:
+    - not ansible_check_mode
+    - not apparmor_runtime_available
+
+- name: Ensure the apparmor service is enabled and running
+  ansible.builtin.systemd:
+    name: apparmor
+    state: started
+    enabled: true
+  when: apparmor_runtime_available
+
+- name: Read AppArmor enabled status
+  ansible.builtin.command: aa-status --enabled
+  register: apparmor_status
+  changed_when: false
+  failed_when: apparmor_status.rc not in [0, 1]
+  check_mode: false
+  when: apparmor_runtime_available
+
+- name: Fail if AppArmor is installed but not enabled
+  ansible.builtin.fail:
+    msg: "AppArmor is installed but not enabled (aa-status --enabled returned non-zero)."
+  when:
+    - apparmor_runtime_available
+    - apparmor_status.rc is defined
+    - apparmor_status.rc != 0

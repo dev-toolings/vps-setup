@@ -18,6 +18,9 @@ PermitEmptyPasswords no
 ChallengeResponseAuthentication no
 KbdInteractiveAuthentication no
 UsePAM yes
+{% if ssh_allow_users | default([]) | length > 0 %}
+AllowUsers {{ ssh_allow_users | join(' ') }}
+{% endif %}
 
 # Key authentication
 AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys2

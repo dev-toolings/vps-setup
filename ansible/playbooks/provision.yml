@@ -16,12 +16,26 @@
       when: vps_components.users | default(false)
       tags: [users]
 
+- name: Tailscale (join tailnet before security may close the public SSH port)
+  hosts: all
+  roles:
+    - role: tailscale
+      when: vps_components.tailscale | default(false)
+      tags: [tailscale]
+
 - name: Security hardening
   hosts: all
   roles:
     - role: security
       when: vps_components.security | default(true)
       tags: [security]
+
+- name: Additional hardening (AppArmor, unattended security upgrades)
+  hosts: all
+  roles:
+    - role: hardening
+      when: vps_components.hardening | default(false)
+      tags: [hardening]
 
 - name: Docker installation
   hosts: all

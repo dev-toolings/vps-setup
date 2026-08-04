@@ -65,3 +65,124 @@
   when: >
     remote_authorized_keys_stat.stat is defined
     and remote_authorized_keys_stat.stat.exists
+
+# --- AllowUsers guard (invariant 3, moved from roles/security/tasks/ufw.yml) ---
+# If ssh_allow_users is set but omits deploy_user, sshd would end up allowing
+# logins for a list of accounts that does not include the one account this
+# repo guarantees survives hardening. This used to live in ufw.yml, tagged
+# [security, ufw]; `--tags ssh` writes sshd_config's AllowUsers block via
+# ssh.yml without ever including ufw.yml, so the guard was decorative on that
+# path (proven: `--tags ssh --list-tasks` lists ssh.yml but not ufw.yml).
+# preflight.yml is included with `tags: always`, so it runs whenever the
+# security role runs at all, regardless of --tags.
+
+- name: AllowUsers guard - fail if ssh_allow_users is set but omits deploy_user
+  ansible.builtin.fail:
+    msg: >-
+      ssh_allow_users is set to {{ ssh_allow_users | default([]) }} but does
+      not include deploy_user ('{{ deploy_user | default('deploy') }}').
+      Restricting sshd's AllowUsers without including the deploy account
+      would lock out the only account guaranteed to survive hardening. Add
+      '{{ deploy_user | default('deploy') }}' to ssh_allow_users or leave it
+      empty.
+  when:
+    - ssh_allow_users | default([]) | length > 0
+    - (deploy_user | default('deploy')) not in (ssh_allow_users | default([]))
+
+# --- Lockout guard -------------------------------------------------------
+# If no non-root account with a key exists by the end of this play, once
+# ssh_permit_root_login is set to "no", the server becomes reachable only
+# through the hosting provider's KVM/rescue console. This guard fails before
+# sshd_config is ever touched unless one of four explicit escape routes
+# holds - including the account already connected right now: the checks at
+# the top of this file already stat and cat ~/.ssh/authorized_keys for
+# ansible_user, but never fed that into this guard. If that account is not
+# root and already has a key, disabling root login locks out nothing; not
+# reading it here meant refusing legitimate runs (e.g. a host administered
+# from an 'ubuntu' or 'admin' account with no 'deploy' account at all),
+# which pushes operators toward reaching for allow_ssh_lockout out of habit
+# - neutralizing the guard exactly where it was right to fire.
+#
+# Escape route 1 does NOT recompute "will the users role run" from
+# vps_components.users: a --tags selection can drop the whole 'users' play
+# while vps_components.users stays true, which made that recomputation lie
+# (proven: `--tags security --list-tasks` shows the users play with zero
+# tasks while the security play still disables root login). Instead it reads
+# users_role_confirms_deploy_key, a FACT set by roles/users/tasks/main.yml
+# itself, at the tail of its own task list. That fact can only become true if
+# the users role actually executed in this same run: 'users' always plays
+# before 'security' (provision.yml, security.yml), and Ansible facts set on a
+# host in one play remain visible to later plays against the same host in the
+# same invocation.
+
+- name: Lockout guard - determine if this run disables root SSH login
+  ansible.builtin.set_fact:
+    lockout_guard_disables_root: "{{ (ssh_permit_root_login | default('no') | string) == 'no' }}"
+
+# Path convention, not guessed: this repo's own 'users' role never sets a
+# custom home for deploy_user (plain `ansible.builtin.user`, create_home:
+# true, no `home:`), and its own "Ensure deploy SSH directory exists" task a
+# few lines above in roles/users/tasks/main.yml writes to this exact
+# "/home/{{ deploy_user }}/.ssh" path. Reading from `~{{ deploy_user }}`
+# instead would be more general, but ansible.builtin.command does not invoke
+# a shell: `~deploy` would never be expanded and would be passed through
+# literally, making this probe fail shut on every run (failed_when: false
+# would swallow that as "no key", not as "path syntax not supported").
+# Fixing that would require ansible.builtin.shell or a getent-based lookup,
+# more moving parts for a convention this repo's own role already enforces
+# on the one account this guard cares about. Left as /home/ on purpose.
+- name: Lockout guard - probe deploy_user authorized_keys already present on the target
+  ansible.builtin.command: "cat /home/{{ deploy_user | default('deploy') }}/.ssh/authorized_keys"
+  register: lockout_guard_remote_deploy_keys
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when:
+    - lockout_guard_disables_root
+    - not (allow_ssh_lockout | default(false) | bool)
+
+- name: Lockout guard - evaluate escape routes
+  ansible.builtin.set_fact:
+    lockout_guard_users_role_confirmed_key: "{{ users_role_confirms_deploy_key | default(false) }}"
+    lockout_guard_target_already_has_key: >-
+      {{
+        lockout_guard_remote_deploy_keys is defined
+        and lockout_guard_remote_deploy_keys.rc is defined
+        and lockout_guard_remote_deploy_keys.rc == 0
+        and (lockout_guard_remote_deploy_keys.stdout | default('') | trim | length > 0)
+      }}
+    # remote_ssh_keys is `cat ~/.ssh/authorized_keys` for the CONNECTED
+    # account, already registered by the pre-flight checks at the top of
+    # this file. Content, not existence: stdout must be non-empty, the same
+    # standard as lockout_guard_target_already_has_key above.
+    lockout_guard_connected_account_has_key: >-
+      {{
+        (ansible_user | default('') != 'root')
+        and (remote_ssh_keys.stdout | default('') | trim | length > 0)
+      }}
+  when: lockout_guard_disables_root
+
+- name: Lockout guard - refuse to disable root SSH login without a surviving non-root account
+  ansible.builtin.fail:
+    msg: |
+      Refusing to disable root SSH login (ssh_permit_root_login: "no"): no non-root
+      account with an SSH key would survive this run, which would lock this server
+      out except through the hosting provider's KVM/rescue console.
+
+      Pick one explicit escape route:
+        1. Run the 'users' role in this same execution (vps_components.users: true)
+           with a reachable, non-empty deploy_user_authorized_keys_source or a
+           non-empty deploy_user_authorized_keys list, so account
+           '{{ deploy_user | default('deploy') }}' gets a key. This only counts if
+           the 'users' play actually runs: check --tags/--skip-tags did not drop it.
+        2. Ensure '{{ deploy_user | default('deploy') }}' already has a non-empty
+           authorized_keys on the target before hardening SSH alone.
+        3. Connect as a non-root account that already has a non-empty authorized_keys
+           (currently connected as '{{ ansible_user | default('unknown') }}').
+        4. Set allow_ssh_lockout: true to explicitly accept the risk and skip this guard.
+  when:
+    - lockout_guard_disables_root
+    - not (allow_ssh_lockout | default(false) | bool)
+    - not (lockout_guard_users_role_confirmed_key | default(false))
+    - not (lockout_guard_target_already_has_key | default(false))
+    - not (lockout_guard_connected_account_has_key | default(false))

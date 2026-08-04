@@ -1,0 +1,21 @@
+// {{ ansible_managed }}
+// Security-origin unattended upgrades only. Automatic-Reboot is deliberately
+// false: this host may run Docker and PostgreSQL, and an unplanned restart is
+// worse than a delayed kernel update. See README for the maintenance window.
+
+Unattended-Upgrade::Origins-Pattern {
+{% if ansible_facts.distribution == "Debian" %}
+    "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+{% else %}
+    "origin=Ubuntu,archive=${distro_codename}-security,label=Ubuntu";
+{% endif %}
+};
+
+Unattended-Upgrade::Automatic-Reboot "{{ unattended_upgrades_automatic_reboot | bool | ternary('true', 'false') }}";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "false";
+{% if unattended_upgrades_mail_to %}
+Unattended-Upgrade::Mail "{{ unattended_upgrades_mail_to }}";
+Unattended-Upgrade::MailOnlyOnError "true";
+{% endif %}

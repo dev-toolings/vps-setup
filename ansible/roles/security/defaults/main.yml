@@ -32,6 +32,15 @@ ssh_x11_forwarding: "no"
 ssh_allow_agent_forwarding: "yes"
 ssh_allow_tcp_forwarding: "yes"
 
+# Restrict SSH logins to specific Linux users (opt-in). Empty list emits no
+# AllowUsers directive at all: sshd_config renders identically to today.
+ssh_allow_users: []
+
+# Bind the "allow SSH" UFW rule to a single interface (e.g. "tailscale0")
+# instead of allowing it on every interface, and drop the public rule when
+# set. Empty string preserves today's behavior exactly (public SSH rule).
+ufw_ssh_interface: ""
+
 # Cloudflare origin lock (on-demand)
 # Blocks direct-to-origin access bypassing Cloudflare. Enforced in DOCKER-USER
 # because Docker/Swarm-ingress traffic bypasses UFW. Set to true to enable.

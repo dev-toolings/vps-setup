@@ -44,6 +44,8 @@ export const ProfileComponentsSchema = z.object({
   database: z.boolean().default(false),
   swarm: z.boolean().default(false),
   rebuild: z.boolean().default(false),
+  tailscale: z.boolean().default(false),
+  hardening: z.boolean().default(false),
 });
 
 /**

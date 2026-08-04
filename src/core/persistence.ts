@@ -12,6 +12,11 @@ import {
   VPS_BARE_METAL_COMPONENTS,
   VPS_SWARM_COMPONENTS,
 } from "@/types/index.ts";
+// NOTE: not re-exported from @/types/index.ts (that barrel file is outside
+// this agent's assigned ownership for this change) - imported directly from
+// its source module instead. See the mission report for the flag to fold
+// this export into the barrel later.
+import { VPS_PRIVATE_COMPONENTS } from "@/types/profile.ts";
 import { parseYaml, toYaml, debug, error } from "@/utils/index.ts";
 import { parseServer, parseProfile, parseConfig } from "@/utils/index.ts";
 
@@ -138,6 +143,26 @@ export class PersistenceManager {
           target_mode: "vps",
           stack_mode: "swarm",
           caddy_swarm_enabled: true,
+        },
+      },
+      {
+        name: "vps-private",
+        description: "Private VPS: no public TCP port, administration only over Tailscale (SSH restricted to tailscale0, AllowUsers restricted to the deploy user)",
+        components: VPS_PRIVATE_COMPONENTS,
+        runtimeUser: "root",
+        overrides: {
+          target_mode: "vps",
+          // Must include deploy_user (default "deploy") or the security role's
+          // lockout guard refuses to render sshd_config. tailscale_auth_key is
+          // NOT set here: it is a secret, supplied at run time with
+          // `-e tailscale_auth_key=...`, never stored in a profile file.
+          ssh_allow_users: ["deploy"],
+          ufw_ssh_interface: "tailscale0",
+          // No public TCP port at all: the group_vars default (22, 80, 443)
+          // would otherwise still open 80/443 to the world even after SSH
+          // moves to tailscale0. This is what actually delivers "zero public
+          // TCP port" - ufw_ssh_interface alone only relocates SSH.
+          ufw_allowed_ports: [],
         },
       },
     ];

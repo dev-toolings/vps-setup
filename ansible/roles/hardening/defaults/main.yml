@@ -1,0 +1,20 @@
+---
+# Hardening role default variables
+
+# AppArmor: install, enable, verify. No custom application profiles are
+# written by this role.
+apparmor_enabled: true
+
+# Unattended security upgrades. Automatic-Reboot stays false on purpose: this
+# host can run Docker and PostgreSQL, and an unplanned service restart (or a
+# dpkg lock held mid-deploy) is worse than a delayed kernel update. Only
+# security-origin packages are upgraded; see README for the maintenance
+# window this implies.
+unattended_upgrades_enabled: true
+unattended_upgrades_automatic_reboot: false
+unattended_upgrades_update_package_lists_interval: 1
+unattended_upgrades_download_upgradeable_interval: 1
+unattended_upgrades_autoclean_interval: 7
+# Optional mail recipient for unattended-upgrades error reports. Empty = no
+# Unattended-Upgrade::Mail directive emitted.
+unattended_upgrades_mail_to: ""

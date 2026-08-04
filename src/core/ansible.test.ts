@@ -20,6 +20,8 @@ describe("AnsibleRunner", () => {
         database: true,
         swarm: false,
         rebuild: true,
+        tailscale: false,
+        hardening: false,
       },
       runtimeUser: "deploy",
       overrides: {

@@ -151,6 +151,8 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
       { value: "database", label: "PostgreSQL + Redis", selected: profile.components.database },
       { value: "swarm", label: "Docker Swarm", selected: profile.components.swarm },
       { value: "rebuild", label: "Rebuild Metadata", selected: profile.components.rebuild },
+      { value: "tailscale", label: "Tailscale", selected: profile.components.tailscale },
+      { value: "hardening", label: "Hardening (AppArmor + unattended upgrades)", selected: profile.components.hardening },
     ],
   });
 
@@ -169,6 +171,8 @@ async function setupFlow(pm: PersistenceManager): Promise<void> {
     database: selectedComponentNames.includes("database"),
     swarm: selectedComponentNames.includes("swarm"),
     rebuild: selectedComponentNames.includes("rebuild"),
+    tailscale: selectedComponentNames.includes("tailscale"),
+    hardening: selectedComponentNames.includes("hardening"),
   };
 
   // Show summary

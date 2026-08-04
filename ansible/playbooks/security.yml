@@ -10,5 +10,8 @@
   roles:
     - role: common
       tags: [common]
+    - role: users
+      when: vps_components.users | default(false)
+      tags: [users]
     - role: security
       tags: [security, ufw, fail2ban, ssh]

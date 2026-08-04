@@ -1,0 +1,12 @@
+---
+# Hardening role - AppArmor + unattended security upgrades
+
+- name: Include AppArmor tasks
+  ansible.builtin.include_tasks: apparmor.yml
+  when: apparmor_enabled | default(true)
+  tags: apparmor
+
+- name: Include unattended-upgrades tasks
+  ansible.builtin.include_tasks: unattended_upgrades.yml
+  when: unattended_upgrades_enabled | default(true)
+  tags: unattended_upgrades

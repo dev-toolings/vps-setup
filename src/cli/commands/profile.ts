@@ -29,6 +29,8 @@ export function createProfileCommands(pm: PersistenceManager): Command {
     .option("--database", "Enable system-wide PostgreSQL/Redis")
     .option("--swarm", "Enable Docker Swarm (single-node manager)")
     .option("--rebuild", "Enable rebuild/export metadata")
+    .option("--tailscale", "Join a Tailscale tailnet and prove connectivity")
+    .option("--hardening", "Enable AppArmor + unattended security upgrades")
     .option("--runtime-user <user>", "Runtime user for services")
     .action(async (name, options) => {
       header(`Create Profile: ${name}`);
@@ -44,7 +46,8 @@ export function createProfileCommands(pm: PersistenceManager): Command {
       // Check if any component flags were provided
       const hasFlags = options.docker || options.phpFpm || options.caddy ||
         options.nodejs || options.nvm || options.bun || options.security ||
-        options.users || options.database || options.swarm || options.rebuild;
+        options.users || options.database || options.swarm || options.rebuild ||
+        options.tailscale || options.hardening;
 
       if (hasFlags && options.runtimeUser) {
         // Non-interactive mode
@@ -63,6 +66,8 @@ export function createProfileCommands(pm: PersistenceManager): Command {
             database: options.database || false,
             swarm: options.swarm || false,
             rebuild: options.rebuild || false,
+            tailscale: options.tailscale || false,
+            hardening: options.hardening || false,
           },
           runtimeUser: options.runtimeUser,
         };
@@ -90,6 +95,8 @@ export function createProfileCommands(pm: PersistenceManager): Command {
                   { value: "database", label: "PostgreSQL + Redis", hint: "System-wide database services" },
                   { value: "swarm", label: "Docker Swarm", hint: "Single-node manager + deterministic networking" },
                   { value: "rebuild", label: "Rebuild Metadata", hint: "Exportable restore configuration" },
+                  { value: "tailscale", label: "Tailscale", hint: "Join tailnet, prove connectivity" },
+                  { value: "hardening", label: "Hardening", hint: "AppArmor + unattended security upgrades" },
                 ],
                 initialValues: [] as string[],
                 required: true,
@@ -126,6 +133,8 @@ export function createProfileCommands(pm: PersistenceManager): Command {
           database: selectedComponents.includes("database"),
           swarm: selectedComponents.includes("swarm"),
           rebuild: selectedComponents.includes("rebuild"),
+          tailscale: selectedComponents.includes("tailscale"),
+          hardening: selectedComponents.includes("hardening"),
         };
 
         profileData = {
@@ -228,6 +237,8 @@ export function createProfileCommands(pm: PersistenceManager): Command {
         database: "PostgreSQL + Redis",
         swarm: "Docker Swarm",
         rebuild: "Rebuild Metadata",
+        tailscale: "Tailscale",
+        hardening: "Hardening (AppArmor + unattended upgrades)",
       };
 
       for (const [key, label] of Object.entries(componentLabels)) {
@@ -285,6 +296,8 @@ export function createProfileCommands(pm: PersistenceManager): Command {
                 { value: "database", label: "PostgreSQL + Redis" },
                 { value: "swarm", label: "Docker Swarm" },
                 { value: "rebuild", label: "Rebuild Metadata" },
+                { value: "tailscale", label: "Tailscale" },
+                { value: "hardening", label: "Hardening (AppArmor + unattended upgrades)" },
               ],
               initialValues: Object.entries(prof.components)
                 .filter(([, enabled]) => enabled)
@@ -322,6 +335,8 @@ export function createProfileCommands(pm: PersistenceManager): Command {
         database: selectedComponents.includes("database"),
         swarm: selectedComponents.includes("swarm"),
         rebuild: selectedComponents.includes("rebuild"),
+        tailscale: selectedComponents.includes("tailscale"),
+        hardening: selectedComponents.includes("hardening"),
       };
 
       // Validate at least one component is enabled

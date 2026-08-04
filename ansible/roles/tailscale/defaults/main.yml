@@ -1,0 +1,24 @@
+---
+# Tailscale role default variables
+
+# Pre-authenticated key used to join the tailnet non-interactively. Read from
+# a variable (vault, -e, or environment-backed extra-vars) - never hardcode a
+# real value here. Empty by default: if the node is not already connected and
+# no key is supplied, the role fails loudly instead of skipping the join.
+tailscale_auth_key: ""
+
+# Hostname this node registers as on the tailnet.
+tailscale_hostname: "{{ inventory_hostname }}"
+
+# Accept the tailnet's MagicDNS nameservers.
+tailscale_accept_dns: true
+
+# Tailscale SSH (the vendor's own SSH-over-tailnet feature) is a separate
+# access path from OpenSSH + AllowUsers. Off by default: this role only
+# proves tailnet connectivity for the security role's UFW rule, it does not
+# change how SSH authentication happens.
+tailscale_ssh_enabled: false
+
+# How long to wait for the backend to report "Running" after joining.
+tailscale_wait_retries: 10
+tailscale_wait_delay: 3
