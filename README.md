@@ -6,7 +6,7 @@
 
 Gérez plusieurs serveurs, profiles de configuration et historique des déploiements, le tout depuis un CLI élégant et intuitif.
 
-[![GitHub release](https://img.shields.io/github/v/release/MakFly/vps-setup?style=for-the-badge&logo=github&color=blue)](https://github.com/MakFly/vps-setup/releases)
+[![GitHub release](https://img.shields.io/github/v/release/dev-toolings/vps-setup?style=for-the-badge&logo=github&color=blue)](https://github.com/dev-toolings/vps-setup/releases)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 [![Bun](https://img.shields.io/badge/runtime-Bun-black?style=for-the-badge&logo=bun)](https://bun.sh)
 [![Ansible](https://img.shields.io/badge/automation-Ansible-red?style=for-the-badge&logo=ansible)](https://ansible.com)
@@ -34,7 +34,7 @@ Gérez plusieurs serveurs, profiles de configuration et historique des déploiem
 ### Via script d'installation (recommandé)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MakFly/vps-setup/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dev-toolings/vps-setup/main/install.sh | bash
 ```
 
 ### Via téléchargement direct
@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/MakFly/vps-setup/main/install.sh | 
 <summary><b>🐧 Linux x64</b></summary>
 
 ```bash
-curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-linux-x64 \
+curl -fsSL https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-linux-x64 \
   -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
 ```
 </details>
@@ -52,7 +52,7 @@ curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setu
 <summary><b>🐧 Linux ARM64</b></summary>
 
 ```bash
-curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-linux-arm64 \
+curl -fsSL https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-linux-arm64 \
   -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
 ```
 </details>
@@ -61,7 +61,7 @@ curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setu
 <summary><b>🍎 macOS (Apple Silicon)</b></summary>
 
 ```bash
-curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-darwin-arm64 \
+curl -fsSL https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-darwin-arm64 \
   -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
 ```
 </details>
@@ -70,7 +70,7 @@ curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setu
 <summary><b>🍎 macOS (Intel)</b></summary>
 
 ```bash
-curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-darwin-x64 \
+curl -fsSL https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-darwin-x64 \
   -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
 ```
 </details>
@@ -80,14 +80,14 @@ curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setu
 
 ```powershell
 # PowerShell
-Invoke-WebRequest -Uri "https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-windows-x64.exe" -OutFile "vps-setup.exe"
+Invoke-WebRequest -Uri "https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-windows-x64.exe" -OutFile "vps-setup.exe"
 ```
 </details>
 
 ### Depuis les sources
 
 ```bash
-git clone https://github.com/MakFly/vps-setup.git
+git clone https://github.com/dev-toolings/vps-setup.git
 cd vps-setup
 bun install
 bun run build
@@ -457,7 +457,7 @@ vps-setup/
 
 ```bash
 # Cloner et installer
-git clone https://github.com/MakFly/vps-setup.git
+git clone https://github.com/dev-toolings/vps-setup.git
 cd vps-setup
 bun install
 
@@ -486,6 +486,6 @@ Ce projet est sous licence [MIT](LICENSE).
 
 **Fait avec ❤️ par [MakFly](https://github.com/MakFly)**
 
-[Signaler un bug](https://github.com/MakFly/vps-setup/issues) • [Demander une fonctionnalité](https://github.com/MakFly/vps-setup/issues)
+[Signaler un bug](https://github.com/dev-toolings/vps-setup/issues) • [Demander une fonctionnalité](https://github.com/dev-toolings/vps-setup/issues)
 
 </div>

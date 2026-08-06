@@ -25,7 +25,7 @@ Before installing VPS Setup, make sure the following tools are available on your
 The fastest way to get started:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MakFly/vps-setup/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dev-toolings/vps-setup/main/install.sh | bash
 ```
 
 ### Direct download
@@ -34,31 +34,31 @@ Download the pre-compiled binary for your platform:
 
 **Linux x64**
 ```bash
-curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-linux-x64 \
+curl -fsSL https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-linux-x64 \
   -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
 ```
 
 **Linux ARM64**
 ```bash
-curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-linux-arm64 \
+curl -fsSL https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-linux-arm64 \
   -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
 ```
 
 **macOS (Apple Silicon)**
 ```bash
-curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-darwin-arm64 \
+curl -fsSL https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-darwin-arm64 \
   -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
 ```
 
 **macOS (Intel)**
 ```bash
-curl -fsSL https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-darwin-x64 \
+curl -fsSL https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-darwin-x64 \
   -o ~/.local/bin/vps-setup && chmod +x ~/.local/bin/vps-setup
 ```
 
 **Windows x64**
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/MakFly/vps-setup/releases/latest/download/vps-setup-windows-x64.exe" -OutFile "vps-setup.exe"
+Invoke-WebRequest -Uri "https://github.com/dev-toolings/vps-setup/releases/latest/download/vps-setup-windows-x64.exe" -OutFile "vps-setup.exe"
 ```
 
 ### From source
@@ -66,7 +66,7 @@ Invoke-WebRequest -Uri "https://github.com/MakFly/vps-setup/releases/latest/down
 Build VPS Setup from source using [Bun](https://bun.sh):
 
 ```bash
-git clone https://github.com/MakFly/vps-setup.git
+git clone https://github.com/dev-toolings/vps-setup.git
 cd vps-setup
 bun install
 bun run build

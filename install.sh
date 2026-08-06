@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # VPS Setup CLI Installer
-# Install:     curl -fsSL https://raw.githubusercontent.com/MakFly/vps-setup/main/install.sh | bash
-# Uninstall:   curl -fsSL https://raw.githubusercontent.com/MakFly/vps-setup/main/install.sh | bash -s -- --uninstall
+# Install:     curl -fsSL https://raw.githubusercontent.com/dev-toolings/vps-setup/main/install.sh | bash
+# Uninstall:   curl -fsSL https://raw.githubusercontent.com/dev-toolings/vps-setup/main/install.sh | bash -s -- --uninstall
 #
 # Options (via env vars):
 #   METHOD=binary   Download pre-built binary (default)
@@ -12,7 +12,7 @@
 
 set -e
 
-REPO="MakFly/vps-setup"
+REPO="dev-toolings/vps-setup"
 BINARY_NAME="vps-setup"
 INSTALL_DIR="$HOME/.local/bin"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/vps-setup"

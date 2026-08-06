@@ -6,12 +6,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MakFly/vps-setup.git"
+    "url": "https://github.com/dev-toolings/vps-setup.git"
   },
   "bugs": {
-    "url": "https://github.com/MakFly/vps-setup/issues"
+    "url": "https://github.com/dev-toolings/vps-setup/issues"
   },
-  "homepage": "https://github.com/MakFly/vps-setup#readme",
+  "homepage": "https://github.com/dev-toolings/vps-setup#readme",
   "type": "module",
   "bin": {
     "vps-setup": "./dist/vps-setup"
