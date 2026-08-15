@@ -15,6 +15,15 @@ services:
       - caddy_config:/config
     networks:
       - {{ caddy_swarm_network }}
+    # Probe the admin API on loopback: it answers only once the Caddyfile has
+    # been loaded, so an unparseable config surfaces as an unhealthy task
+    # instead of an edge that accepts connections and serves nothing.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --timeout=3 http://127.0.0.1:{{ caddy_swarm_admin_port }}/config/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     deploy:
       replicas: 1
       restart_policy:
