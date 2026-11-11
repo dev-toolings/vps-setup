@@ -22,7 +22,6 @@ coverage/
 # Temp
 *.tmp
 *.temp
-config.bat
 
 # instant-grep index
 .ig/
